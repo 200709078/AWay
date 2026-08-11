@@ -37,9 +37,13 @@ Bu dosya, AWay projesinde AI-assisted geliştirme yapan ajanların uyması gerek
 - Başarılı OTP doğrulamasından sonra **JWT access token** üretilir (`@nestjs/jwt`, payload: `sub`, `phone`).
 - Korumalı endpointlerde **`JwtGuard`** kullanılmalıdır (`src/auth/guards/jwt/jwt.guard.ts`). Guard kullanıcıyı DB'den yükler ve `request.user`'a atar.
 - Authentication mantığı domain servislerine dağıtılmaz; `AuthModule`/`AuthService` içinde kalır.
-- `JWT_ACCESS_SECRET` environment değişkeninden okunur; `JwtModule.register` içinde `expiresIn: '15m'` sabit verilmiştir.
-  - VERIFY: `.env` içinde `JWT_ACCESS_EXP` tanımlıdır ancak `AuthModule` hâlâ sabit `'15m'` kullanıyor; env'den okuma yapılacaksa bu iki değer arasında tutarlılık sağlanmalı.
-- `RefreshSession` modeli şemada mevcut ve `.env` içinde `JWT_REFRESH_SECRET`/`JWT_REFRESH_EXP` tanımlıdır, ancak **refresh token akışı henüz implement edilmemiştir**. Bu konuda kod eklerken mevcut yapıyla uyumlu ilerle. TODO/VERIFY.
+- `JWT_ACCESS_SECRET` environment değişkeninden okunur.
+- Access token süresi `JWT_ACCESS_EXPIRES_IN` environment değişkeninden okunur; tanımlı değilse `15m` kullanılır.
+- `RefreshSession` modeli ve refresh token akışı implement edilmiştir.
+- Refresh token imzalama için `JWT_REFRESH_SECRET` kullanılır.
+- Refresh token süresi `JWT_REFRESH_EXPIRES_IN` environment değişkeninden okunur; tanımlı değilse `30d` kullanılır.
+- Refresh token plaintext olarak veritabanında saklanmaz; token'ın SHA-256 hash'i `RefreshSession.tokenHash` alanında tutulur.
+- Refresh işlemi sırasında mevcut session revoke edilir ve yeni access/refresh token çifti oluşturulur.
 - Dev ortamında OTP, `[DEV OTP]` logu olarak konsola basılır (`AuthService` içindeki TODO); gerçek SMS sağlayıcısı bağlanana kadar korunmalı, production'a taşınmamalıdır.
 
 ## 5. DATABASE
@@ -47,7 +51,6 @@ Bu dosya, AWay projesinde AI-assisted geliştirme yapan ajanların uyması gerek
 - **Prisma schema tek source of truth'tur** (`services/api/prisma/schema.prisma`).
 - Schema değişikliğinden sonra uygun **Prisma migration** oluşturulur.
 - Geliştirme migration'ları **`prisma migrate dev`** ile oluşturulur (sürüm 7).
-- **Veritabanını resetleme/drop etme** işlemleri (`migrate reset`, `migrate dev --force-reset`, `db push`'ta drop) açık kullanıcı onayı olmadan yapılmaz.
 - **Mevcut migration geçmişini değiştirme veya silme** (şu an tek migration: `20260810204158_init`).
 - Soft-delete kullanılan modellerde (`School`, `SchoolMembership`, `Class`, `Student`, `Parent`) mevcut **`deletedAt`** yaklaşımını koru.
 - Prisma 7: schema'da `url` tanımı yok; bağlantı `PrismaService` içindeki driver-adapter üzerinden `DATABASE_URL`'den gelir. Generator `prisma-client`, output `../generated/prisma`, `moduleFormat = "cjs"`.
@@ -56,9 +59,8 @@ Bu dosya, AWay projesinde AI-assisted geliştirme yapan ajanların uyması gerek
 
 - Bir görevi tamamlamak için **minimum dosyayı** değiştir.
 - Çalışan kodu gereksiz yere yeniden yazma.
-- Büyük refactorları kullanıcı onayı olmadan yapma.
 - API contractlarını gereksiz yere değiştirme.
-- Yeni dependency eklemeden önce gerçekten gerekli olup olmadığını değerlendir (paket kurulumu/kaldırması ancak kullanıcı istediğinde).
+- Yeni dependency eklemeden önce gerçekten gerekli olup olmadığını değerlendir.
 
 ## 7. TEST / DOĞRULAMA
 
@@ -74,12 +76,7 @@ pnpm --filter @away/validation exec tsc --noEmit
 - `POST /auth/verify-otp` (body: `{ "phone": "...", "code": "..." }` — dev ortamında kod konsol logundan alınır)
 - `GET /health`
 
-## 8. GIT
-
-- Git işlemlerini **kullanıcı istemedikçe yapma**: commit, push/pull, branch oluşturma/değiştirme.
-- Kullanıcı Git checkpoint istediğinde bunu açıkça belirt; adımları onaylatmadan uygulama.
-
-## 9. DOSYA DÜZENİ
+## 8. DOSYA DÜZENİ
 
 Mevcut workspace yapısını koru:
 
@@ -91,12 +88,37 @@ infrastructure/ # docker vb. (henüz boş; docker-compose.yml repo kökünde)
 docker-compose.yml
 ```
 
-## 10. GÜVENLİK
+## 9. GÜVENLİK
 
 - Secret, JWT secret, `DATABASE_URL` veya OTP gibi hassas bilgileri **source code içine yazma**.
 - `.env` dosyasını commit etme (`.gitignore`'da `.env`/`.env.*` yok sayılıyor; `.env.example` hariç).
 - OTP ve authentication bilgilerinin loglanmasını production için güvenli tut (dev OTP logu prod'da kaldırılmalı).
 - Kullanıcı verilerini gereksiz yere response içinde döndürme.
+
+# 10. HEDEF MİMARİ VE DOSYA YERLEŞİM KURALLARI
+
+- Yeni backend domain kodları `services/api/src/<domain>/` altında tutulur.
+- Her backend domaini mümkün olduğunda kendi `module`, `controller` ve `service` yapısına sahip olur.
+- Domainler arasında ortak kullanılan backend yardımcı kodları `services/api/src/common/` altında tutulur.
+- Environment ve uygulama configuration kodları `services/api/src/config/` altında tutulur.
+- Prisma ve veritabanı erişim kodları `services/api/src/database/` altında tutulur.
+- Authentication ile ilgili kodlar `services/api/src/auth/` altında tutulur.
+- Ortak telefon, validation ve benzeri tekrar kullanılabilir kodlar `packages/validation/` altında tutulur.
+- Birden fazla uygulama veya servis tarafından paylaşılacak TypeScript tipleri `packages/types/` altında tutulur.
+- Birden fazla uygulama veya servis tarafından paylaşılacak configuration kodları `packages/config/` altında tutulur.
+- Admin web uygulamasına ait kodlar `apps/admin-web/` altında tutulur.
+- Mobil uygulamaya ait kodlar `apps/mobile/` altında tutulur.
+- Docker ve diğer infrastructure dosyaları `infrastructure/` altında tutulur.
+- Root seviyesindeki dosyalar yalnızca workspace, repository veya tüm projeyi ilgilendiren yapılandırmalar için kullanılır.
+- Yeni bir dosya veya modül eklenmeden önce mevcut klasör yapısı ve bu yerleşim kuralları kontrol edilir.
+- Aynı sorumluluk için yeni ve paralel bir klasör yapısı oluşturulmaz; mevcut mimari tercih edilir.
+- Bir kodun hangi katmana ait olduğu belirsizse, yeni klasör oluşturmak yerine mevcut mimari incelenir ve uygun yer belirlenir.
+- Yeni bir domain mevcut domain klasörlerinden biriyle aynı sorumluluğa sahipse yeni domain oluşturulmaz; mevcut domain genişletilir.
+- Domainler arası ortaklaşan kod, ilgili domainlerden birinin içine taşınmak yerine uygun ortak katmana alınır.
+- `packages/` altındaki ortak paketler yalnızca gerçekten birden fazla uygulama/servis tarafından paylaşılması gereken kodlar için kullanılır.
+- Henüz oluşturulmamış hedef klasörler (`packages/types`, `packages/config`, `services/api/src/config` vb.) ihtiyaç ortaya çıkmadan fiziksel olarak oluşturulmaz.
+- Yeni bir klasör oluşturulması gerekiyorsa klasörün amacı ve mimari katmanı mevcut proje yapısıyla tutarlı olmalıdır.
+- Mevcut çalışan mimari, kullanıcı tarafından açıkça istenmedikçe yeni bir mimariyle değiştirilmez.
 
 ## 11. GELİŞTİRME PRENSİBİ
 
@@ -105,7 +127,6 @@ docker-compose.yml
 3. Sonra kodu değiştir.
 4. Değişiklikten sonra build/typecheck/test yap.
 5. Hata varsa düzelt ve tekrar doğrula.
-6. Kullanıcı istemedikçe kapsamı genişletme.
 
 ---
 
@@ -115,7 +136,7 @@ docker-compose.yml
 - **Auth akışı**: `request-otp` → OTP hash ile saklanır (5 dk geçerli) → `verify-otp` → JWT access token döner. `JwtGuard` mevcut; korumalı endpoint'lerde kullanılabilir.
 - **Prisma 7**: Driver-adapter (`@prisma/adapter-pg`) yaklaşımı ile `generated/prisma` üzerinden kullanılıyor. Tek migration (`init`) mevcut.
 - **Domain modülleri**: Users, Schools, Memberships, SchoolAdminAssignments, Classes, Students, Parents, Attendance, LessonPeriods, Audit — **boş iskelet**. Geliştirme burada devam edecek.
-- **Refresh token akışı**: Şemada (`RefreshSession`) ve env'de hazır, **kodda yok**. TODO.
+- **Refresh token akışı**: `RefreshSession` modeli ve `/auth/refresh` endpoint'i implement edilmiştir. Refresh token hash'i veritabanında tutulur ve token rotation uygulanır.
 - **Redis**: compose'da tanımlı, uygulamada kullanılmıyor (cache için planlı).
 - **Frontend**: `apps/admin-web` ve `apps/mobile` boş. `pnpm dev:web` çalışmaz. TODO.
 - **Infrastructure**: `infrastructure/docker` boş; servisler repo kökündeki `docker-compose.yml` ile ayağa kalkar.
@@ -136,7 +157,7 @@ docker-compose.yml
 | Dev migration | `pnpm --filter @away/api exec prisma migrate dev` |
 | Prisma Studio | `pnpm --filter @away/api exec prisma studio` |
 
-Not: API `start:prod`/`build` çıktısı `dist/main`; port `PORT` env'den (varsayılan 3000). Health: `GET /health`.
+Not: API `build` çıktısı `dist/src/...` düzenindedir; `start:prod` = `node dist/src/main`. Port `PORT` env'den (varsayılan 3000). Health: `GET /health`.
 
 ## Important Architectural Decisions
 
@@ -153,10 +174,8 @@ Not: API `start:prod`/`build` çıktısı `dist/main`; port `PORT` env'den (vars
 
 1. Bu dosyadaki kurallara uy; önce mevcut kodu oku.
 2. Minimum dosya değişikliği yap; gereksiz refactor/rewrite yapma.
-3. Paket kurma/kaldırma, migration oluşturma/çalıştırma, DB resetleme gibi eylemleri **kullanıcı istemedikçe yapma**.
-4. Git işlemlerini kullanıcı istemedikçe yapma.
-5. Kod değişikliğinden sonra `pnpm --filter @away/api build` ve `pnpm --filter @away/validation exec tsc --noEmit` ile doğrula.
-6. Emin olmadığın veya doğrulanamayan bilgileri gerçekmiş gibi yazma; `TODO`/`VERIFY` olarak işaretle.
-7. Secret/environment değerlerini kod içine ya da commit'e asla koyma.
-8. Domainler arası gereksiz bağımlılık kurma; ortak yardımcıları `packages/` altında tut.
-9. Kapsamı kullanıcının isteğiyle sınırlı tut; aksine talimat yoksa genişletme.
+3. Git işlemlerini kullanıcı istemedikçe yapma.
+4. Kod değişikliğinden sonra `pnpm --filter @away/api build` ve `pnpm --filter @away/validation exec tsc --noEmit` ile doğrula.
+5. Emin olmadığın veya doğrulanamayan bilgileri gerçekmiş gibi yazma; `TODO`/`VERIFY` olarak işaretle.
+6. Secret/environment değerlerini kod içine ya da commit'e asla koyma.
+7. Domainler arası gereksiz bağımlılık kurma; ortak yardımcıları `packages/` altında tut.

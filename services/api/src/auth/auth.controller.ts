@@ -11,10 +11,12 @@ export class AuthController {
   }
 
   @Post('verify-otp')
-  verifyOtp(
-    @Body('phone') phone: string,
-    @Body('code') code: string,
-  ) {
+  verifyOtp(@Body('phone') phone: string, @Body('code') code: string) {
     return this.authService.verifyOtp(phone, code);
+  }
+
+  @Post('refresh')
+  refresh(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refresh(refreshToken);
   }
 }
