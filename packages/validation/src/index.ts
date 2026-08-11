@@ -1,4 +1,4 @@
 export {
   normalizePhone,
   isValidE164Phone,
-} from './phone';
+} from './phone.js';

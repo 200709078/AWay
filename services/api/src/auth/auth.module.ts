@@ -8,10 +8,21 @@ type JwtExpiresIn = NonNullable<SignOptions['expiresIn']>;
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET,
-      signOptions: {
-        expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN ?? '15m') as JwtExpiresIn,
+    JwtModule.registerAsync({
+      useFactory: () => {
+        const secret = process.env.JWT_ACCESS_SECRET;
+
+        if (!secret) {
+          throw new Error('JWT_ACCESS_SECRET is not defined');
+        }
+
+        return {
+          secret,
+          signOptions: {
+            expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN ??
+              '15m') as JwtExpiresIn,
+          },
+        };
       },
     }),
   ],

@@ -1,12 +1,14 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { SignOptions } from 'jsonwebtoken';
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { PrismaService } from '../database/prisma/prisma.service';
 import { normalizePhone } from '@away/validation';
 
@@ -21,6 +23,8 @@ type JwtExpiresIn = NonNullable<SignOptions['expiresIn']>;
 export class AuthService {
   private readonly refreshSecret: string;
   private readonly refreshExpiresIn: JwtExpiresIn;
+  private static readonly MAX_OTP_ATTEMPTS = 5;
+  private static readonly MAX_OTP_REQUESTS_PER_MINUTE = 3;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -59,6 +63,22 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException(
         'Bu telefon numarası AWay sisteminde kayıtlı değil.',
+      );
+    }
+
+    const recentRequests = await this.prisma.otpCode.count({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gt: new Date(Date.now() - 60 * 1000),
+        },
+      },
+    });
+
+    if (recentRequests >= AuthService.MAX_OTP_REQUESTS_PER_MINUTE) {
+      throw new HttpException(
+        'Çok fazla OTP isteği gönderildi. Lütfen bir dakika sonra tekrar deneyin.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
@@ -128,6 +148,12 @@ export class AuthService {
     if (!otp) {
       throw new UnauthorizedException(
         'Geçerli bir OTP bulunamadı. Yeni bir OTP isteyin.',
+      );
+    }
+
+    if (otp.attempts >= AuthService.MAX_OTP_ATTEMPTS) {
+      throw new UnauthorizedException(
+        'OTP deneme limiti aşıldı. Yeni bir OTP isteyin.',
       );
     }
 
@@ -254,6 +280,55 @@ export class AuthService {
     };
   }
 
+  async logout(refreshTokenInput: string) {
+    if (!refreshTokenInput) {
+      throw new UnauthorizedException('Refresh token gerekli.');
+    }
+
+    let payload: RefreshTokenPayload;
+
+    try {
+      payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshTokenInput,
+        { secret: this.refreshSecret },
+      );
+    } catch {
+      throw new UnauthorizedException(
+        'Geçersiz veya süresi dolmuş refresh token.',
+      );
+    }
+
+    if (!payload.sub) {
+      throw new UnauthorizedException('Geçersiz refresh token.');
+    }
+
+    const tokenHash = createHash('sha256')
+      .update(refreshTokenInput)
+      .digest('hex');
+
+    const session = await this.prisma.refreshSession.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!session || session.revokedAt) {
+      throw new UnauthorizedException('Refresh session bulunamadı.');
+    }
+
+    if (session.expiresAt.getTime() < Date.now()) {
+      throw new UnauthorizedException('Refresh session süresi dolmuş.');
+    }
+
+    await this.prisma.refreshSession.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: new Date(),
+        lastUsedAt: new Date(),
+      },
+    });
+
+    return { message: 'Oturum kapatıldı.' };
+  }
+
   private async issueTokens(userId: string, phone: string) {
     const accessToken = await this.jwtService.signAsync({
       sub: userId,
@@ -261,7 +336,7 @@ export class AuthService {
     });
 
     const refreshToken = await this.jwtService.signAsync(
-      { sub: userId, phone },
+      { sub: userId, phone, jti: randomUUID() },
       {
         secret: this.refreshSecret,
         expiresIn: this.refreshExpiresIn,
@@ -278,11 +353,21 @@ export class AuthService {
 
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 
+    await this.prisma.refreshSession.deleteMany({
+      where: {
+        userId,
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
+
     await this.prisma.refreshSession.create({
       data: {
         userId,
         tokenHash,
         expiresAt,
+        lastUsedAt: new Date(),
       },
     });
 
