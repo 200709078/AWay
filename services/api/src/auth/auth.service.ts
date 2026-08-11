@@ -9,6 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import type { SignOptions } from 'jsonwebtoken';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
+import ms from 'ms';
 import { PrismaService } from '../database/prisma/prisma.service';
 import { normalizePhone } from '@away/validation';
 
@@ -347,9 +348,14 @@ export class AuthService {
       refreshToken,
     );
 
+    const refreshMs =
+      typeof this.refreshExpiresIn === 'number'
+        ? this.refreshExpiresIn
+        : ms(this.refreshExpiresIn);
+
     const expiresAt = decoded?.exp
       ? new Date(decoded.exp * 1000)
-      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      : new Date(Date.now() + refreshMs);
 
     const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
 

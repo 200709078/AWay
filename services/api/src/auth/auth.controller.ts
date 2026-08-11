@@ -1,27 +1,30 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('request-otp')
-  requestOtp(@Body('phone') phone: string) {
-    return this.authService.requestOtp(phone);
+  requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestOtp(dto.phone);
   }
 
   @Post('verify-otp')
-  verifyOtp(@Body('phone') phone: string, @Body('code') code: string) {
-    return this.authService.verifyOtp(phone, code);
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto.phone, dto.code);
   }
 
   @Post('refresh')
-  refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refresh(refreshToken);
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto.refreshToken);
   }
 
   @Post('logout')
-  logout(@Body('refreshToken') refreshToken: string) {
-    return this.authService.logout(refreshToken);
+  logout(@Body() dto: RefreshTokenDto) {
+    return this.authService.logout(dto.refreshToken);
   }
 }
