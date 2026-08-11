@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: away-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: away
+      POSTGRES_USER: away
+      POSTGRES_PASSWORD: away_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - away_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U away -d away"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: away-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - away_redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  away_postgres_data:
+  away_redis_data:

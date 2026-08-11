@@ -1,0 +1,11 @@
+{
+  "name": "away",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @away/api start:dev",
+    "dev:web": "pnpm --filter @away/admin-web dev",
+    "dev": "pnpm run dev:api"
+  }
+}
