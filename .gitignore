@@ -11,6 +11,11 @@ dist/
 build/
 coverage/
 
+# Emitted Prisma config artifacts (source of truth: services/api/prisma.config.ts)
+services/api/prisma.config.js
+services/api/prisma.config.js.map
+services/api/prisma.config.d.ts
+
 # Generated Prisma Client
 services/api/generated/
 

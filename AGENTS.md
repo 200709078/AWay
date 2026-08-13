@@ -9,6 +9,7 @@ Bu dosya, AWay projesinde AI-assisted geliştirme yapan ajanların uyması gerek
 - Database: **PostgreSQL 17** + **Prisma 7**.
 - Cache / gelecek kullanım: **Redis 7** (docker-compose'da tanımlı, henüz uygulama kodunda kullanılmıyor).
 - Monorepo: **pnpm workspace** (`pnpm-workspace.yaml` → `apps/*`, `services/*`, `packages/*`).
+- Runtime: **Node.js >= 22.13** ve **pnpm 11.21.0**. Doğrulanmış geliştirme sürümü Node 22.23.2'dir; Node 20, bu pnpm sürümünü çalıştıramaz.
 - Yardımcı paketler: `packages/validation` (`@away/validation`).
 - Frontend app'leri: `apps/admin-web`, `apps/mobile` — **henüz scaffold edilmedi** (boş klasörler, `pnpm dev:web` çalışmaz). TODO/VERIFY: admin-web uygulaması scaffold edilene kadar `dev:web` kullanılmamalı.
 
@@ -19,7 +20,8 @@ Bu dosya, AWay projesinde AI-assisted geliştirme yapan ajanların uyması gerek
 - **`PrismaService`'in mevcut Prisma 7 driver-adapter yaklaşımını bozma** (`@prisma/adapter-pg` + `PrismaPg`, `DATABASE_URL`'den).
 - Ortak validation/utility kodları uygun olduğunda `packages/` altında tutulur (ör. `packages/validation`).
 - Domainler arasında gereksiz doğrudan bağımlılık oluşturma; paylaşılan erişim için global `PrismaModule` kullanılabilir.
-- Şu an yalnızca `AuthModule`, `HealthModule` ve `PrismaModule` içerik dolu; diğer domain modülleri (Users, Schools, Memberships, Classes, Students, Parents, Attendance, LessonPeriods, Audit, SchoolAdminAssignments) boş iskelettir (`@Module({})`).
+- Commitlenmiş baseline'da yalnızca `AuthModule`, `HealthModule` ve `PrismaModule` içerik doludur; diğer domain modülleri (Users, Schools, Memberships, Classes, Students, Parents, Attendance, LessonPeriods, Audit, SchoolAdminAssignments) boş iskelettir (`@Module({})`). Çalışma ağacındaki commitlenmemiş işleri ayrıca kontrol et.
+- `JwtGuard` yalnızca kimlik doğrulamasıdır. Yeni domain endpointlerinde, ihtiyaca göre aktif `SchoolMembership`, rol ve okul/tenant kapsamı ayrıca doğrulanmalıdır. Bu kural, V1'de öğretmen için sabit sınıf veya ders ataması yapılacağı anlamına gelmez.
 
 ## 3. TELEFON NUMARALARI
 
@@ -44,7 +46,7 @@ Bu dosya, AWay projesinde AI-assisted geliştirme yapan ajanların uyması gerek
 - Refresh token süresi `JWT_REFRESH_EXPIRES_IN` environment değişkeninden okunur; tanımlı değilse `30d` kullanılır.
 - Refresh token plaintext olarak veritabanında saklanmaz; token'ın SHA-256 hash'i `RefreshSession.tokenHash` alanında tutulur.
 - Refresh işlemi sırasında mevcut session revoke edilir ve yeni access/refresh token çifti oluşturulur.
-- Dev ortamında OTP, `[DEV OTP]` logu olarak konsola basılır (`AuthService` içindeki TODO); gerçek SMS sağlayıcısı bağlanana kadar korunmalı, production'a taşınmamalıdır.
+- Geliştirme ortamında OTP, `[DEV OTP]` logu olarak konsola basılabilir; gerçek SMS sağlayıcısı bağlanana kadar production'a taşınmamalıdır. Mevcut `AuthService` çıktısı ortam kontrolü olmadan logluyor; production'a çıkmadan önce açık bir environment guard ile sınırlandırılmalıdır.
 
 ## 5. DATABASE
 
@@ -54,6 +56,7 @@ Bu dosya, AWay projesinde AI-assisted geliştirme yapan ajanların uyması gerek
 - **Mevcut migration geçmişini değiştirme veya silme** (şu an tek migration: `20260810204158_init`).
 - Soft-delete kullanılan modellerde (`School`, `SchoolMembership`, `Class`, `Student`, `Parent`) mevcut **`deletedAt`** yaklaşımını koru.
 - Prisma 7: schema'da `url` tanımı yok; bağlantı `PrismaService` içindeki driver-adapter üzerinden `DATABASE_URL`'den gelir. Generator `prisma-client`, output `../generated/prisma`, `moduleFormat = "cjs"`.
+- Prisma CLI bağlantı/migration ayarını `services/api/prisma.config.ts` üzerinden alır. Derlenmiş `prisma.config.js`, `.map` ve `.d.ts` dosyaları kaynak değildir; repoya eklenmemeli ve Prisma CLI'ın config çözümlemesini gölgelememelidir.
 
 ## 6. KOD DEĞİŞİKLİĞİ
 
@@ -128,11 +131,32 @@ docker-compose.yml
 4. Değişiklikten sonra build/typecheck/test yap.
 5. Hata varsa düzelt ve tekrar doğrula.
 
+## 12. V1 ÜRÜN VE İŞ KURALLARI
+
+Bu bölüm hedef davranışı tanımlar; burada yazan her madde mevcut şema veya endpointler tarafından henüz uygulanmış değildir. Bir maddeyi uygulamadan önce mevcut modelin yeterliliğini incele, gerekiyorsa yeni migration ve test planı oluştur.
+
+- AWay ilk günden **multi-tenant** tasarlanır. Bir okulun verisi başka okulun kullanıcısına görünmemeli veya değiştirilememelidir; `schoolId` tek başına güvenlik kontrolü sayılmaz.
+- V1'in odağı yoklamadır. Bildirimler, özel/grup mesajlaşma, gerçek SMS/push, abonelik/faturalama, gelişmiş raporlar ve OCR tabanlı içe aktarma sonraki fazlardır.
+- Şemadaki `MembershipRole.ADMIN`, V1'deki okul yöneticisi/süper admin rolüdür. Her okulda en az bir aktif admin kalmalı; son adminin devri/kaldırılması yeni admin ataması veya platform düzeyi kurtarma akışı olmadan mümkün olmamalıdır.
+- Kimlik ve onboarding modelinde ayrı kayıt formu/parola yoktur: okul yönetimi kişi ile E.164 telefonunu önceden tanımlar; kişi ilk girişini telefon + OTP ile yapar. Aynı global kullanıcı farklı okullarda ve rollerle bulunabilir. Mevcut `User`/`Student`/`Parent` şeması ve `AuthService` bu ön-tanımlama akışını henüz bütünüyle karşılamaz; onboarding görevi önce bu farkı tasarlamalıdır.
+- V1'de öğretmen–ders veya öğretmen–sınıf sabit ataması yoktur. Nöbetçi dahil yetkili öğretmen yoklama gönderebilir; yine de gönderim yapan kullanıcının ilgili okulda aktif ve uygun rollü üyeliği doğrulanır.
+- Yoklamada girilen öğrenci numaraları **devamsız** öğrencileri temsil eder; girilmeyen aktif öğrenciler mevcut kabul edilir. Girilen numaralar kayıtlı, tekrarsız ve aynı sınıfta olmalıdır. Numaralardan sınıf bulunabilir; liste boşsa "herkes mevcut" yoklaması için istemci sınıfı açıkça belirtmelidir.
+- Ders saati kullanıcı seçimiyle değil, okulun gün bazlı ders saatleri ve sunucu zamanına göre belirlenir. Her günün ders saatleri farklı tanımlanabilir.
+- Aynı okul, sınıf, tarih ve ders saati için ikinci yoklama kabul edilmez; ilk kayıttan sonra düzeltme/iptal idare akışıdır ve denetlenmelidir. İptal edilmiş bir kaydın yerine yenisinin açılıp açılamayacağı, endpoint yazılmadan önce açıkça kararlaştırılmalıdır.
+- AWay, e-Okul'un yerine geçmez. Nakil geçmişi tutulmaz; yönetici güncel öğrenci listesini ekler veya kaldırır. Geçmiş yoklama bütünlüğü için öğrenci soft-delete/pasifleştirme yaklaşımı korunur. e-Okul'a aktarılan yoklamanın arşivlenmesi veya silinmesi için ayrı bir yaşam döngüsü gerekir; mevcut `Attendance` modelinde bunun için `deletedAt` veya aktarım durumu yoktur.
+- Bir öğrenci birden fazla veliye, bir veli de birden fazla öğrenciye bağlanabilir. Mevcut `ParentStudent` ilişkisinin many-to-many yapısı korunur.
+- Toplu öğrenci/veli/öğretmen içe aktarma, çekirdek yoklama akışından sonra ele alınır. Uygulandığında akış parse → doğrulama → önizleme → yönetici onayı → atomik transaction olmalıdır; Excel/CSV/ODS önceliklidir, PDF/fotoğraf OCR daha sonraki aşamadır.
+
+## 13. AJAN ÇALIŞMA ONAYI
+
+- Görev kapsamındaki normal dosya düzenleme, terminal komutu, migration, test verisi oluşturma/temizleme ve doğrulama işlemleri için ajanın kullanıcıdan ayrıca interaktif onay istemesi gerekmez.
+- Bu çalışma kuralı, AWay uygulamasındaki kullanıcı authentication/authorization kurallarını gevşetmez veya kaldırmaz.
+
 ---
 
 ## Current Project Status
 
-- **Backend (`services/api`)**: NestJS 11 temeli kurulu ve build alıyor. Yalnızca `Auth` (OTP giriş + JWT), `Health` ve global `Prisma` modülleri işlevsel.
+- **Backend (`services/api`)**: Commitlenmiş baseline'da NestJS 11 temeli kurulu ve build alıyor. Yalnızca `Auth` (OTP giriş + JWT), `Health` ve global `Prisma` modülleri işlevsel. Çalışma ağacında commitlenmemiş iş olabileceği için geliştirmeden önce `git status` ile gerçek durumu kontrol et.
 - **Auth akışı**: `request-otp` → OTP hash ile saklanır (5 dk geçerli) → `verify-otp` → JWT access token döner. `JwtGuard` mevcut; korumalı endpoint'lerde kullanılabilir.
 - **Prisma 7**: Driver-adapter (`@prisma/adapter-pg`) yaklaşımı ile `generated/prisma` üzerinden kullanılıyor. Tek migration (`init`) mevcut.
 - **Domain modülleri**: Users, Schools, Memberships, SchoolAdminAssignments, Classes, Students, Parents, Attendance, LessonPeriods, Audit — **boş iskelet**. Geliştirme burada devam edecek.
@@ -153,11 +177,11 @@ docker-compose.yml
 | API E2E test | `pnpm --filter @away/api test:e2e` |
 | Validation typecheck | `pnpm --filter @away/validation exec tsc --noEmit` |
 | Validation build | `pnpm --filter @away/validation build` |
-| Prisma client üret | `pnpm --filter @away/api exec prisma generate` |
-| Dev migration | `pnpm --filter @away/api exec prisma migrate dev` |
-| Prisma Studio | `pnpm --filter @away/api exec prisma studio` |
+| Prisma client üret | `pnpm --dir services/api exec prisma generate` |
+| Dev migration | `pnpm --dir services/api exec prisma migrate dev` |
+| Prisma Studio | `pnpm --dir services/api exec prisma studio` |
 
-Not: API `build` çıktısı `dist/src/...` düzenindedir; `start:prod` = `node dist/src/main`. Port `PORT` env'den (varsayılan 3000). Health: `GET /health`.
+Not: Bu komutlar Node >= 22.13 gerektirir. API `build` çıktısı `dist/src/...` düzenindedir; `start:prod` = `node dist/src/main`. Port `PORT` env'den (varsayılan 3000). Health: `GET /health`.
 
 ## Important Architectural Decisions
 
