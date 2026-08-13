@@ -212,6 +212,8 @@ model SchoolLessonPeriod {
 
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
+  // The raw `lesson_period_constraints` migration additionally enforces the
+  // minute range and non-overlapping [startMinute, endMinute) intervals.
   @@unique([schoolId, dayOfWeek, lessonNumber])
   @@index([schoolId, dayOfWeek])
 }
@@ -295,6 +297,7 @@ model AttendanceEditRequest {
   @@index([attendanceId, status])
   @@index([requestedByMembershipId, status])
   @@index([reviewedByMembershipId])
+  // A raw migration ensures at most one PENDING or APPROVED request per attendance.
 }
 
 model OtpCode {

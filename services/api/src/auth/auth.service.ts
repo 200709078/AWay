@@ -3,19 +3,26 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { SignOptions } from 'jsonwebtoken';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import ms from 'ms';
-import { PrismaService } from '../database/prisma/prisma.service';
+import { SchoolStatus } from '../../generated/prisma/client';
 import { normalizePhone } from '@away/validation';
+import { PrismaService } from '../database/prisma/prisma.service';
 
 interface RefreshTokenPayload {
   sub: string;
   phone: string;
+}
+
+interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  refreshTokenHash: string;
+  refreshExpiresAt: Date;
 }
 
 type JwtExpiresIn = NonNullable<SignOptions['expiresIn']>;
@@ -43,102 +50,46 @@ export class AuthService {
   }
 
   async requestOtp(phoneInput: string) {
-    let phone: string;
-
-    try {
-      phone = normalizePhone(phoneInput, 'TR');
-    } catch {
-      throw new BadRequestException('Geçersiz telefon numarası.');
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { phone },
-      select: {
-        id: true,
-        phone: true,
-        firstName: true,
-        lastName: true,
-      },
-    });
+    const phone = this.normalizePhone(phoneInput);
+    const user = await this.findEligibleUserByPhone(phone);
 
     if (!user) {
-      throw new NotFoundException(
-        'Bu telefon numarası AWay sisteminde kayıtlı değil.',
-      );
-    }
-
-    const recentRequests = await this.prisma.otpCode.count({
-      where: {
-        userId: user.id,
-        createdAt: {
-          gt: new Date(Date.now() - 60 * 1000),
-        },
-      },
-    });
-
-    if (recentRequests >= AuthService.MAX_OTP_REQUESTS_PER_MINUTE) {
-      throw new HttpException(
-        'Çok fazla OTP isteği gönderildi. Lütfen bir dakika sonra tekrar deneyin.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      return this.otpRequestResponse(phone);
     }
 
     const code = randomInt(100000, 1000000).toString();
-
     const codeHash = createHash('sha256').update(code).digest('hex');
 
-    await this.prisma.otpCode.create({
-      data: {
-        userId: user.id,
-        codeHash,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-      },
-    });
+    await this.createOtp(user.id, codeHash);
 
-    // TODO: Gerçek SMS sağlayıcısı bağlanınca kaldırılacak.
-    console.log(`[DEV OTP] ${phone}: ${code}`);
+    if (this.isDevelopmentEnvironment()) {
+      // TODO: Gerçek SMS sağlayıcısı bağlanınca kaldırılacak.
+      console.log(`[DEV OTP] ${phone}: ${code}`);
+    }
 
-    return {
-      message: 'OTP gönderildi.',
-      phone,
-    };
+    return this.otpRequestResponse(phone);
   }
 
   async verifyOtp(phoneInput: string, code: string) {
-    let phone: string;
-
-    try {
-      phone = normalizePhone(phoneInput, 'TR');
-    } catch {
-      throw new BadRequestException('Geçersiz telefon numarası.');
-    }
+    const phone = this.normalizePhone(phoneInput);
 
     if (!/^\d{6}$/.test(code)) {
       throw new BadRequestException('OTP 6 haneli olmalıdır.');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { phone },
-      select: {
-        id: true,
-        phone: true,
-        firstName: true,
-        lastName: true,
-      },
-    });
+    const user = await this.findEligibleUserByPhone(phone);
 
     if (!user) {
-      throw new NotFoundException(
-        'Bu telefon numarası AWay sisteminde kayıtlı değil.',
-      );
+      throw new UnauthorizedException('OTP doğrulanamadı.');
     }
 
+    const now = new Date();
     const otp = await this.prisma.otpCode.findFirst({
       where: {
         userId: user.id,
         consumedAt: null,
         expiresAt: {
-          gt: new Date(),
+          gt: now,
         },
       },
       orderBy: {
@@ -146,23 +97,23 @@ export class AuthService {
       },
     });
 
-    if (!otp) {
+    if (!otp || otp.attempts >= AuthService.MAX_OTP_ATTEMPTS) {
       throw new UnauthorizedException(
         'Geçerli bir OTP bulunamadı. Yeni bir OTP isteyin.',
-      );
-    }
-
-    if (otp.attempts >= AuthService.MAX_OTP_ATTEMPTS) {
-      throw new UnauthorizedException(
-        'OTP deneme limiti aşıldı. Yeni bir OTP isteyin.',
       );
     }
 
     const codeHash = createHash('sha256').update(code).digest('hex');
 
     if (codeHash !== otp.codeHash) {
-      await this.prisma.otpCode.update({
-        where: { id: otp.id },
+      await this.prisma.otpCode.updateMany({
+        where: {
+          id: otp.id,
+          consumedAt: null,
+          attempts: {
+            lt: AuthService.MAX_OTP_ATTEMPTS,
+          },
+        },
         data: {
           attempts: {
             increment: 1,
@@ -173,12 +124,45 @@ export class AuthService {
       throw new UnauthorizedException('OTP hatalı.');
     }
 
-    await this.prisma.otpCode.update({
-      where: { id: otp.id },
-      data: {
-        consumedAt: new Date(),
-      },
+    const consumed = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.otpCode.updateMany({
+        where: {
+          id: otp.id,
+          userId: user.id,
+          codeHash,
+          consumedAt: null,
+          expiresAt: {
+            gt: now,
+          },
+          attempts: {
+            lt: AuthService.MAX_OTP_ATTEMPTS,
+          },
+        },
+        data: {
+          consumedAt: now,
+        },
+      });
+
+      if (result.count !== 1) {
+        return false;
+      }
+
+      await tx.user.updateMany({
+        where: {
+          id: user.id,
+          phoneVerifiedAt: null,
+        },
+        data: {
+          phoneVerifiedAt: now,
+        },
+      });
+
+      return true;
     });
+
+    if (!consumed) {
+      throw new UnauthorizedException('OTP artık geçerli değil.');
+    }
 
     const { accessToken, refreshToken } = await this.issueTokens(
       user.id,
@@ -187,12 +171,7 @@ export class AuthService {
 
     return {
       message: 'OTP doğrulandı.',
-      user: {
-        id: user.id,
-        phone: user.phone,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
+      user,
       accessToken,
       refreshToken,
     };
@@ -203,81 +182,123 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token gerekli.');
     }
 
-    let payload: RefreshTokenPayload;
+    const payload = await this.verifyRefreshToken(refreshTokenInput);
+    const tokenHash = this.hashToken(refreshTokenInput);
 
-    try {
-      payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
-        refreshTokenInput,
-        { secret: this.refreshSecret },
-      );
-    } catch {
-      throw new UnauthorizedException(
-        'Geçersiz veya süresi dolmuş refresh token.',
-      );
-    }
+    const rotation = await this.prisma.$transaction(async (tx) => {
+      const session = await tx.refreshSession.findUnique({
+        where: { tokenHash },
+      });
 
-    if (!payload.sub) {
-      throw new UnauthorizedException('Geçersiz refresh token.');
-    }
+      if (!session) {
+        throw new UnauthorizedException('Refresh session bulunamadı.');
+      }
 
-    const tokenHash = createHash('sha256')
-      .update(refreshTokenInput)
-      .digest('hex');
+      if (session.userId !== payload.sub) {
+        throw new UnauthorizedException(
+          'Refresh token kullanıcıyla eşleşmiyor.',
+        );
+      }
 
-    const session = await this.prisma.refreshSession.findUnique({
-      where: { tokenHash },
+      if (session.revokedAt) {
+        return { kind: 'replayed' as const };
+      }
+
+      const now = new Date();
+
+      if (session.expiresAt.getTime() <= now.getTime()) {
+        throw new UnauthorizedException('Refresh session süresi dolmuş.');
+      }
+
+      const user = await tx.user.findFirst({
+        where: {
+          id: session.userId,
+          memberships: {
+            some: {
+              deletedAt: null,
+              school: {
+                is: {
+                  status: SchoolStatus.ACTIVE,
+                  deletedAt: null,
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          phone: true,
+          firstName: true,
+          lastName: true,
+        },
+      });
+
+      if (!user) {
+        await tx.refreshSession.updateMany({
+          where: {
+            id: session.id,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: now,
+            lastUsedAt: now,
+          },
+        });
+
+        return { kind: 'ineligible' as const };
+      }
+
+      const tokens = await this.createTokenPair(user.id, user.phone);
+      const revoked = await tx.refreshSession.updateMany({
+        where: {
+          id: session.id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+          lastUsedAt: now,
+        },
+      });
+
+      if (revoked.count !== 1) {
+        return { kind: 'replayed' as const };
+      }
+
+      await tx.refreshSession.deleteMany({
+        where: {
+          userId: user.id,
+          expiresAt: {
+            lt: now,
+          },
+        },
+      });
+
+      await tx.refreshSession.create({
+        data: {
+          userId: user.id,
+          tokenHash: tokens.refreshTokenHash,
+          expiresAt: tokens.refreshExpiresAt,
+          lastUsedAt: now,
+        },
+      });
+
+      return { kind: 'rotated' as const, user, tokens };
     });
 
-    if (!session) {
-      throw new UnauthorizedException('Refresh session bulunamadı.');
-    }
-
-    if (session.revokedAt) {
+    if (rotation.kind === 'replayed') {
       await this.revokeAllSessions(payload.sub);
-      throw new UnauthorizedException('Refresh session iptal edilmiş.');
+      throw new UnauthorizedException('Refresh token yeniden kullanılmış.');
     }
 
-    if (session.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedException('Refresh session süresi dolmuş.');
+    if (rotation.kind === 'ineligible') {
+      throw new UnauthorizedException('Aktif okul üyeliğiniz bulunmuyor.');
     }
-
-    if (session.userId !== payload.sub) {
-      throw new UnauthorizedException('Refresh token kullanıcıyla eşleşmiyor.');
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: session.userId },
-      select: {
-        id: true,
-        phone: true,
-        firstName: true,
-        lastName: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı.');
-    }
-
-    await this.prisma.refreshSession.update({
-      where: { id: session.id },
-      data: {
-        revokedAt: new Date(),
-        lastUsedAt: new Date(),
-      },
-    });
-
-    const tokens = await this.issueTokens(user.id, user.phone);
 
     return {
       message: 'Token yenilendi.',
-      user: {
-        id: user.id,
-        phone: user.phone,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-      ...tokens,
+      user: rotation.user,
+      accessToken: rotation.tokens.accessToken,
+      refreshToken: rotation.tokens.refreshToken,
     };
   }
 
@@ -286,51 +307,197 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token gerekli.');
     }
 
-    let payload: RefreshTokenPayload;
-
-    try {
-      payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
-        refreshTokenInput,
-        { secret: this.refreshSecret },
-      );
-    } catch {
-      throw new UnauthorizedException(
-        'Geçersiz veya süresi dolmuş refresh token.',
-      );
-    }
-
-    if (!payload.sub) {
-      throw new UnauthorizedException('Geçersiz refresh token.');
-    }
-
-    const tokenHash = createHash('sha256')
-      .update(refreshTokenInput)
-      .digest('hex');
-
-    const session = await this.prisma.refreshSession.findUnique({
-      where: { tokenHash },
-    });
-
-    if (!session || session.revokedAt) {
-      throw new UnauthorizedException('Refresh session bulunamadı.');
-    }
-
-    if (session.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedException('Refresh session süresi dolmuş.');
-    }
-
-    await this.prisma.refreshSession.update({
-      where: { id: session.id },
+    const payload = await this.verifyRefreshToken(refreshTokenInput);
+    const now = new Date();
+    const revoked = await this.prisma.refreshSession.updateMany({
+      where: {
+        tokenHash: this.hashToken(refreshTokenInput),
+        userId: payload.sub,
+        revokedAt: null,
+        expiresAt: {
+          gt: now,
+        },
+      },
       data: {
-        revokedAt: new Date(),
-        lastUsedAt: new Date(),
+        revokedAt: now,
+        lastUsedAt: now,
       },
     });
+
+    if (revoked.count !== 1) {
+      throw new UnauthorizedException('Refresh session bulunamadı.');
+    }
 
     return { message: 'Oturum kapatıldı.' };
   }
 
+  private normalizePhone(phoneInput: string): string {
+    try {
+      return normalizePhone(phoneInput, 'TR');
+    } catch {
+      throw new BadRequestException('Geçersiz telefon numarası.');
+    }
+  }
+
+  private async findEligibleUserByPhone(phone: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        phone,
+        memberships: {
+          some: {
+            deletedAt: null,
+            school: {
+              is: {
+                status: SchoolStatus.ACTIVE,
+                deletedAt: null,
+              },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+  }
+
+  private async createOtp(userId: string, codeHash: string): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(
+          async (tx) => {
+            const recentRequests = await tx.otpCode.count({
+              where: {
+                userId,
+                createdAt: {
+                  gt: new Date(Date.now() - 60 * 1000),
+                },
+              },
+            });
+
+            if (recentRequests >= AuthService.MAX_OTP_REQUESTS_PER_MINUTE) {
+              throw new HttpException(
+                'Çok fazla OTP isteği gönderildi. Lütfen bir dakika sonra tekrar deneyin.',
+                HttpStatus.TOO_MANY_REQUESTS,
+              );
+            }
+
+            const now = new Date();
+
+            await tx.otpCode.updateMany({
+              where: {
+                userId,
+                consumedAt: null,
+              },
+              data: {
+                consumedAt: now,
+              },
+            });
+
+            await tx.otpCode.create({
+              data: {
+                userId,
+                codeHash,
+                expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+              },
+            });
+          },
+          { isolationLevel: 'Serializable' },
+        );
+
+        return;
+      } catch (error) {
+        if (attempt < 2 && this.isSerializationFailure(error)) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  private otpRequestResponse(phone: string) {
+    return {
+      message: 'Telefon numarası uygunsa OTP gönderildi.',
+      phone,
+    };
+  }
+
+  private isDevelopmentEnvironment(): boolean {
+    return !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+  }
+
+  private isSerializationFailure(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'P2034'
+    );
+  }
+
+  private async verifyRefreshToken(
+    refreshTokenInput: string,
+  ): Promise<RefreshTokenPayload> {
+    try {
+      const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshTokenInput,
+        { secret: this.refreshSecret },
+      );
+
+      if (!payload.sub) {
+        throw new UnauthorizedException('Geçersiz refresh token.');
+      }
+
+      return payload;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new UnauthorizedException(
+        'Geçersiz veya süresi dolmuş refresh token.',
+      );
+    }
+  }
+
   private async issueTokens(userId: string, phone: string) {
+    const tokens = await this.createTokenPair(userId, phone);
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.refreshSession.deleteMany({
+        where: {
+          userId,
+          expiresAt: {
+            lt: now,
+          },
+        },
+      });
+
+      await tx.refreshSession.create({
+        data: {
+          userId,
+          tokenHash: tokens.refreshTokenHash,
+          expiresAt: tokens.refreshExpiresAt,
+          lastUsedAt: now,
+        },
+      });
+    });
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  private async createTokenPair(
+    userId: string,
+    phone: string,
+  ): Promise<TokenPair> {
     const accessToken = await this.jwtService.signAsync({
       sub: userId,
       phone,
@@ -347,37 +514,27 @@ export class AuthService {
     const decoded = this.jwtService.decode<{ exp?: number } | null>(
       refreshToken,
     );
-
-    const refreshMs =
+    const refreshDuration =
       typeof this.refreshExpiresIn === 'number'
         ? this.refreshExpiresIn
         : ms(this.refreshExpiresIn);
 
-    const expiresAt = decoded?.exp
-      ? new Date(decoded.exp * 1000)
-      : new Date(Date.now() + refreshMs);
+    if (typeof refreshDuration !== 'number') {
+      throw new Error('JWT_REFRESH_EXPIRES_IN geçersiz.');
+    }
 
-    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+    return {
+      accessToken,
+      refreshToken,
+      refreshTokenHash: this.hashToken(refreshToken),
+      refreshExpiresAt: decoded?.exp
+        ? new Date(decoded.exp * 1000)
+        : new Date(Date.now() + refreshDuration),
+    };
+  }
 
-    await this.prisma.refreshSession.deleteMany({
-      where: {
-        userId,
-        expiresAt: {
-          lt: new Date(),
-        },
-      },
-    });
-
-    await this.prisma.refreshSession.create({
-      data: {
-        userId,
-        tokenHash,
-        expiresAt,
-        lastUsedAt: new Date(),
-      },
-    });
-
-    return { accessToken, refreshToken };
+  private hashToken(value: string): string {
+    return createHash('sha256').update(value).digest('hex');
   }
 
   private async revokeAllSessions(userId: string) {

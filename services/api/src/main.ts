@@ -14,10 +14,30 @@ async function bootstrap() {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-  app.enableCors({
-    origin:
-      corsOrigin.length === 1 && corsOrigin[0] === '*' ? true : corsOrigin,
-  });
+  const usesWildcardOrigin = corsOrigin.length === 1 && corsOrigin[0] === '*';
+  const includesWildcardOrigin = corsOrigin.includes('*');
+
+  if (includesWildcardOrigin && !usesWildcardOrigin) {
+    throw new Error('CORS_ORIGIN, * ile başka originleri birlikte içeremez.');
+  }
+
+  if (
+    process.env.NODE_ENV === 'production' &&
+    (usesWildcardOrigin || corsOrigin.length === 0)
+  ) {
+    throw new Error(
+      'Production ortamında CORS_ORIGIN açık bir web origin listesi olmalıdır.',
+    );
+  }
+
+  app.enableCors(
+    usesWildcardOrigin
+      ? { origin: '*' }
+      : {
+          origin: corsOrigin,
+          credentials: true,
+        },
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -1,0 +1,1 @@
+export const MAX_ABSENT_STUDENT_NUMBERS = 10_000;
