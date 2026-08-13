@@ -15,4 +15,10 @@ export class UsersController {
   me(@CurrentUser() user: CurrentUserType) {
     return this.usersService.findById(user.id);
   }
+
+  @Get('me/schools')
+  @UseGuards(JwtGuard)
+  schools(@CurrentUser() user: CurrentUserType) {
+    return this.usersService.findActiveSchools(user.id);
+  }
 }

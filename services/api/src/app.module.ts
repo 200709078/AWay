@@ -12,11 +12,13 @@ import { LessonPeriodsModule } from './lesson-periods/lesson-periods.module';
 import { AuditModule } from './audit/audit.module';
 import { PrismaModule } from './database/prisma/prisma.module';
 import { HealthModule } from './health/health.module';
+import { AuthorizationModule } from './common/authorization/authorization.module';
 
 @Module({
   imports: [
     PrismaModule,
     AuthModule,
+    AuthorizationModule,
     UsersModule,
     SchoolsModule,
     MembershipsModule,

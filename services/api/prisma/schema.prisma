@@ -21,8 +21,21 @@ enum MembershipRole {
 }
 
 enum AttendanceStatus {
-  ACTIVE
-  CANCELLED
+  SUBMITTED
+  LOCKED
+}
+
+enum AttendanceStudentStatus {
+  PRESENT
+  ABSENT
+}
+
+enum AttendanceEditRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  COMPLETED
 }
 
 enum DayOfWeek {
@@ -36,16 +49,17 @@ enum DayOfWeek {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  firstName String
-  lastName  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  phone           String    @unique
+  firstName       String
+  lastName        String
+  phoneVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   memberships     SchoolMembership[]
-  studentProfile  Student?
-  parentProfile   Parent?
+  studentProfiles Student[]
+  parentProfiles  Parent[]
   otpCodes        OtpCode[]
   refreshSessions RefreshSession[]
   auditLogs       AuditLog[]         @relation("AuditActor")
@@ -54,13 +68,14 @@ model User {
 }
 
 model School {
-  id        String       @id @default(cuid())
-  code      String       @unique
-  name      String
-  status    SchoolStatus @default(ACTIVE)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  deletedAt DateTime?
+  id                             String       @id @default(cuid())
+  code                           String       @unique
+  name                           String
+  status                         SchoolStatus @default(ACTIVE)
+  attendanceFinalizedThroughDate DateTime?    @db.Date
+  createdAt                      DateTime     @default(now())
+  updatedAt                      DateTime     @updatedAt
+  deletedAt                      DateTime?
 
   memberships      SchoolMembership[]
   adminAssignments SchoolAdminAssignment[]
@@ -69,6 +84,7 @@ model School {
   attendances      Attendance[]
   students         Student[]
   parents          Parent[]
+  auditLogs        AuditLog[]
 
   @@index([status])
 }
@@ -82,10 +98,15 @@ model SchoolMembership {
   updatedAt DateTime       @updatedAt
   deletedAt DateTime?
 
-  school               School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  adminAssignments     SchoolAdminAssignment[]
-  submittedAttendances Attendance[]
+  school                   School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user                     User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminAssignments         SchoolAdminAssignment[]
+  submittedAttendances     Attendance[]            @relation("AttendanceSubmittedBy")
+  reviewLockedAttendances  Attendance[]            @relation("AttendanceReviewLockedBy")
+  exportedAttendances      Attendance[]            @relation("AttendanceExportedBy")
+  requestedAttendanceEdits AttendanceEditRequest[] @relation("AttendanceEditRequestedBy")
+  reviewedAttendanceEdits  AttendanceEditRequest[] @relation("AttendanceEditReviewedBy")
+  auditLogs                AuditLog[]
 
   @@unique([schoolId, userId, role])
   @@index([schoolId, role])
@@ -127,7 +148,7 @@ model Student {
   id        String    @id @default(cuid())
   schoolId  String
   classId   String
-  userId    String?   @unique
+  userId    String?
   number    Int
   firstName String
   lastName  String
@@ -135,12 +156,13 @@ model Student {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  class    Class                     @relation(fields: [classId], references: [id], onDelete: Restrict)
-  user     User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  school   School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  parents  ParentStudent[]
-  absences AttendanceAbsentStudent[]
+  class               Class                       @relation(fields: [classId], references: [id], onDelete: Restrict)
+  user                User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  school              School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parents             ParentStudent[]
+  attendanceSnapshots AttendanceStudentSnapshot[]
 
+  @@unique([schoolId, userId])
   @@unique([schoolId, number])
   @@index([schoolId, classId])
   @@index([classId, number])
@@ -150,7 +172,7 @@ model Student {
 model Parent {
   id        String    @id @default(cuid())
   schoolId  String
-  userId    String?   @unique
+  userId    String?
   firstName String
   lastName  String
   createdAt DateTime  @default(now())
@@ -161,6 +183,7 @@ model Parent {
   user     User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   students ParentStudent[]
 
+  @@unique([schoolId, userId])
   @@index([schoolId])
   @@index([schoolId, lastName, firstName])
 }
@@ -194,40 +217,84 @@ model SchoolLessonPeriod {
 }
 
 model Attendance {
-  id                      String           @id @default(cuid())
-  schoolId                String
-  classId                 String
-  lessonDate              DateTime         @db.Date
-  lessonNumber            Int
-  submittedByMembershipId String
-  status                  AttendanceStatus @default(ACTIVE)
-  submittedAt             DateTime         @default(now())
-  cancelledAt             DateTime?
-  cancelledByUserId       String?
-  createdAt               DateTime         @default(now())
-  updatedAt               DateTime         @updatedAt
+  id                         String           @id @default(cuid())
+  schoolId                   String
+  classId                    String
+  classNameSnapshot          String
+  lessonDate                 DateTime         @db.Date
+  lessonNumber               Int
+  lessonStartMinuteSnapshot  Int?
+  lessonEndMinuteSnapshot    Int?
+  submittedByMembershipId    String
+  status                     AttendanceStatus @default(SUBMITTED)
+  revision                   Int              @default(1)
+  submittedAt                DateTime         @default(now())
+  reviewLockedAt             DateTime?
+  reviewLockedByMembershipId String?
+  exportedAt                 DateTime?
+  exportedByMembershipId     String?
+  exportedRevision           Int?
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
 
-  school                School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  class                 Class                     @relation(fields: [classId], references: [id], onDelete: Cascade)
-  submittedByMembership SchoolMembership          @relation(fields: [submittedByMembershipId], references: [id], onDelete: Restrict)
-  absentStudents        AttendanceAbsentStudent[]
+  school                   School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class                    Class                       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  submittedByMembership    SchoolMembership            @relation("AttendanceSubmittedBy", fields: [submittedByMembershipId], references: [id], onDelete: Restrict)
+  reviewLockedByMembership SchoolMembership?           @relation("AttendanceReviewLockedBy", fields: [reviewLockedByMembershipId], references: [id], onDelete: SetNull)
+  exportedByMembership     SchoolMembership?           @relation("AttendanceExportedBy", fields: [exportedByMembershipId], references: [id], onDelete: SetNull)
+  studentSnapshots         AttendanceStudentSnapshot[]
+  editRequests             AttendanceEditRequest[]
 
   @@unique([schoolId, classId, lessonDate, lessonNumber])
   @@index([schoolId, lessonDate])
   @@index([classId, lessonDate])
   @@index([submittedByMembershipId])
+  @@index([reviewLockedByMembershipId])
+  @@index([exportedByMembershipId])
 }
 
-model AttendanceAbsentStudent {
-  attendanceId String
-  studentId    String
-  createdAt    DateTime @default(now())
+model AttendanceStudentSnapshot {
+  attendanceId  String
+  studentId     String
+  studentNumber Int
+  firstName     String
+  lastName      String
+  status        AttendanceStudentStatus
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
 
   attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
   student    Student    @relation(fields: [studentId], references: [id], onDelete: Restrict)
 
   @@id([attendanceId, studentId])
   @@index([studentId])
+  @@index([attendanceId, status])
+}
+
+model AttendanceEditRequest {
+  id                      String                      @id @default(cuid())
+  attendanceId            String
+  requestedByMembershipId String
+  reason                  String
+  status                  AttendanceEditRequestStatus @default(PENDING)
+  requestedAt             DateTime                    @default(now())
+  reviewedByMembershipId  String?
+  reviewedAt              DateTime?
+  reviewNote              String?
+  editGrantedAt           DateTime?
+  editExpiresAt           DateTime?
+  completedAt             DateTime?
+  invalidatedAt           DateTime?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+
+  attendance            Attendance        @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  requestedByMembership SchoolMembership  @relation("AttendanceEditRequestedBy", fields: [requestedByMembershipId], references: [id], onDelete: Restrict)
+  reviewedByMembership  SchoolMembership? @relation("AttendanceEditReviewedBy", fields: [reviewedByMembershipId], references: [id], onDelete: SetNull)
+
+  @@index([attendanceId, status])
+  @@index([requestedByMembershipId, status])
+  @@index([reviewedByMembershipId])
 }
 
 model OtpCode {
@@ -259,17 +326,23 @@ model RefreshSession {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorUserId String?
-  action      String
-  entityType  String
-  entityId    String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  schoolId          String?
+  actorUserId       String?
+  actorMembershipId String?
+  action            String
+  entityType        String
+  entityId          String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
 
-  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  school          School?           @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  actor           User?             @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorMembership SchoolMembership? @relation(fields: [actorMembershipId], references: [id], onDelete: SetNull)
 
+  @@index([schoolId, createdAt])
   @@index([actorUserId, createdAt])
+  @@index([actorMembershipId, createdAt])
   @@index([entityType, entityId])
   @@index([createdAt])
 }

@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { SignOptions } from 'jsonwebtoken';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { JwtGuard } from './guards/jwt/jwt.guard';
 
 type JwtExpiresIn = NonNullable<SignOptions['expiresIn']>;
 
@@ -27,7 +28,7 @@ type JwtExpiresIn = NonNullable<SignOptions['expiresIn']>;
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
-  exports: [JwtModule, AuthService],
+  providers: [AuthService, JwtGuard],
+  exports: [JwtModule, AuthService, JwtGuard],
 })
 export class AuthModule {}
