@@ -14,9 +14,11 @@ import {
   createTeacher,
   getTeachers,
   restoreTeacher,
+  updateTeacher,
   type CreateTeacherInput,
   type TeacherStatus,
   type TeacherSummary,
+  type UpdateTeacherInput,
 } from "./teachers-api";
 
 const PAGE_SIZE = 25;
@@ -36,6 +38,7 @@ export function TeachersPage() {
   const deferredSearch = useDeferredValue(search.trim());
   const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<TeacherSummary | null>(null);
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(
     null,
   );
@@ -67,6 +70,20 @@ export function TeachersPage() {
       await invalidateTeachers();
     },
   });
+  const updateMutation = useMutation({
+    mutationFn: ({
+      teacherId: targetId,
+      input,
+    }: {
+      teacherId: string;
+      input: UpdateTeacherInput;
+    }) => updateTeacher(request, schoolId, targetId, input),
+    retry: false,
+    onSuccess: async () => {
+      setEditTarget(null);
+      await invalidateTeachers();
+    },
+  });
   const archiveMutation = useMutation({
     mutationFn: (teacherMembershipId: string) =>
       archiveTeacher(request, schoolId, teacherMembershipId),
@@ -87,15 +104,19 @@ export function TeachersPage() {
   });
 
   const mutationError =
-    createMutation.error ?? archiveMutation.error ?? restoreMutation.error;
+    createMutation.error ?? updateMutation.error ?? archiveMutation.error ?? restoreMutation.error;
   const isMutating =
-    createMutation.isPending || archiveMutation.isPending || restoreMutation.isPending;
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    archiveMutation.isPending ||
+    restoreMutation.isPending;
   const totalPages = teachersQuery.data
     ? Math.max(1, Math.ceil(teachersQuery.data.total / teachersQuery.data.pageSize))
     : 1;
 
   function resetMutationErrors() {
     createMutation.reset();
+    updateMutation.reset();
     archiveMutation.reset();
     restoreMutation.reset();
   }
@@ -211,33 +232,63 @@ export function TeachersPage() {
                 <tbody>
                   {teachersQuery.data.items.map((teacher) => (
                     <tr key={teacher.id}>
-                      <td><strong>{teacher.firstName} {teacher.lastName}</strong></td>
-                      <td className="teacher-phone">{teacher.account.phoneMasked}</td>
+                      <td>
+                      <strong>{teacher.firstName} {teacher.lastName}</strong>
+                      {teacher.address ? (
+                        <span className="teacher-address">{teacher.address}</span>
+                      ) : null}
+                    </td>
+                      <td className="teacher-phone">{teacher.account.phone}</td>
                       <td><TeacherAccountBadge status={teacher.account.status} /></td>
                       <td className="table-date">
                         {formatDate(status === "active" ? teacher.createdAt : teacher.deletedAt)}
                       </td>
                       <td className="class-actions">
-                        {status === "active" && teacher.isCurrentUser ? (
-                          <span
-                            className="self-teacher-access"
-                            title="Kendi öğretmen erişiminizi kapatamazsınız."
-                          >
-                            Kendi erişiminiz
-                          </span>
+                        {status === "active" ? (
+                          <>
+                            <button
+                              className="quiet-action"
+                              type="button"
+                              onClick={() => {
+                                resetMutationErrors();
+                                setEditTarget(teacher);
+                              }}
+                            >
+                              Düzenle
+                            </button>
+                            {teacher.isCurrentUser ? (
+                              <span
+                                className="self-teacher-access"
+                                title="Kendi öğretmen erişiminizi kapatamazsınız."
+                              >
+                                Kendi erişiminiz
+                              </span>
+                            ) : (
+                              <button
+                                className="quiet-action danger-action"
+                                type="button"
+                                onClick={() => {
+                                  resetMutationErrors();
+                                  setConfirmation({
+                                    action: "archive",
+                                    teacher,
+                                  });
+                                }}
+                              >
+                                Erişimi kapat
+                              </button>
+                            )}
+                          </>
                         ) : (
                           <button
-                            className={`quiet-action ${status === "active" ? "danger-action" : ""}`}
+                            className="quiet-action"
                             type="button"
                             onClick={() => {
                               resetMutationErrors();
-                              setConfirmation({
-                                action: status === "active" ? "archive" : "restore",
-                                teacher,
-                              });
+                              setConfirmation({ action: "restore", teacher });
                             }}
                           >
-                            {status === "active" ? "Erişimi kapat" : "Geri yükle"}
+                            Geri yükle
                           </button>
                         )}
                       </td>
@@ -267,6 +318,23 @@ export function TeachersPage() {
             }
           }}
           onSubmit={(input) => createMutation.mutate(input)}
+        />
+      ) : null}
+
+      {editTarget ? (
+        <TeacherEditForm
+          teacher={editTarget}
+          error={mutationError}
+          isSubmitting={updateMutation.isPending}
+          onClose={() => {
+            if (!isMutating) {
+              setEditTarget(null);
+              resetMutationErrors();
+            }
+          }}
+          onSubmit={(input) =>
+            updateMutation.mutate({ teacherId: editTarget.id, input })
+          }
         />
       ) : null}
 
@@ -309,6 +377,7 @@ function TeacherForm({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [localError, setLocalError] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -316,6 +385,7 @@ function TeacherForm({
     const normalizedFirstName = firstName.trim().replace(/\s+/g, " ");
     const normalizedLastName = lastName.trim().replace(/\s+/g, " ");
     const normalizedPhone = phone.trim();
+    const normalizedAddress = address.trim().replace(/\s+/g, " ");
 
     if (!normalizedFirstName || !normalizedLastName || !normalizedPhone) {
       setLocalError("Ad, soyad ve telefon numarasını yazın.");
@@ -326,6 +396,7 @@ function TeacherForm({
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
       phone: normalizedPhone,
+      ...(normalizedAddress ? { address: normalizedAddress } : {}),
     });
   }
 
@@ -390,10 +461,30 @@ function TeacherForm({
               inputMode="tel"
               autoComplete="tel"
               maxLength={32}
-              placeholder="05xx xxx xx xx"
+              onBlur={() => {
+                if (phone === "05") setPhone("");
+              }}
+              onFocus={() => {
+                if (!phone) setPhone("05");
+              }}
+              placeholder="05xxxxxxxxx"
               value={phone}
               onChange={(event) => {
                 setPhone(event.target.value);
+                setLocalError("");
+              }}
+              disabled={isSubmitting}
+            />
+          </label>
+          <label className="address-field" htmlFor="teacher-address">
+            Adres <span className="optional-tag">(isteğe bağlı)</span>
+            <textarea
+              id="teacher-address"
+              maxLength={200}
+              placeholder="Örn. Atatürk Mah. 15. Sok. No: 4"
+              value={address}
+              onChange={(event) => {
+                setAddress(event.target.value);
                 setLocalError("");
               }}
               disabled={isSubmitting}
@@ -420,6 +511,97 @@ function TeacherForm({
             </button>
             <button className="primary-action" type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Ekleniyor…" : "Öğretmeni ekle"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function TeacherEditForm({
+  teacher,
+  error,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: {
+  teacher: TeacherSummary;
+  error: unknown;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: (input: UpdateTeacherInput) => void;
+}) {
+  const [address, setAddress] = useState(teacher.address ?? "");
+  const [localError, setLocalError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSubmit({ address: address.trim().replace(/\s+/g, " ") });
+  }
+
+  const fullName = `${teacher.firstName} ${teacher.lastName}`;
+
+  return (
+    <div className="dialog-backdrop">
+      <section
+        className="dialog-card teacher-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="teacher-edit-title"
+      >
+        <div className="dialog-heading">
+          <div>
+            <p className="eyebrow">ÖĞRETMEN ERİŞİMİ</p>
+            <h2 id="teacher-edit-title">Öğretmeni düzenle</h2>
+          </div>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Pencereyi kapat"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            ×
+          </button>
+        </div>
+        <form className="dialog-form" onSubmit={submit}>
+          <div className="account-setup">
+            <strong>{fullName}</strong>
+            <TeacherAccountBadge status={teacher.account.status} />
+            <p className="edit-phone-line">{teacher.account.phone}</p>
+            <p>
+              Ad, soyad ve telefon, sahibin global hesabından gelir; bu ekrandan
+              değiştirilemez. Erişim bu okul için açık veya kapalı tutulur.
+            </p>
+          </div>
+          <label className="address-field" htmlFor="teacher-edit-address">
+            Adres
+            <textarea
+              id="teacher-edit-address"
+              maxLength={200}
+              placeholder="Örn. Atatürk Mah. 15. Sok. No: 4"
+              value={address}
+              onChange={(event) => {
+                setAddress(event.target.value);
+                setLocalError("");
+              }}
+              disabled={isSubmitting}
+            />
+          </label>
+          {localError ? <p className="dialog-error">{localError}</p> : null}
+          {error ? <p className="dialog-error">{errorMessage(error)}</p> : null}
+          <div className="dialog-actions">
+            <button
+              className="secondary-action"
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Vazgeç
+            </button>
+            <button className="primary-action" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Kaydediliyor…" : "Değişiklikleri kaydet"}
             </button>
           </div>
         </form>

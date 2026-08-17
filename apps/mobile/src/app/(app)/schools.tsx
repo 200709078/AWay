@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { AppScreen, EmptyState, LoadingView, Notice, Pill, PrimaryButton, uiStyles } from "@/components/ui";
+import { AccountMenu } from "@/components/account-menu";
 import { useAuth } from "@/features/auth/auth-context";
 import { getMySchools, getSchoolContext } from "@/features/schools/schools-api";
 import type { MembershipRole, SchoolSummary } from "@/lib/types";
@@ -10,13 +11,12 @@ import { colors, messageForError, roleLabel } from "@/lib/presentation";
 const ATTENDANCE_ROLES: MembershipRole[] = ["ADMIN", "TEACHER"];
 
 export default function SchoolsScreen() {
-  const { request, session, selectSchool, selectedSchool, signOut } = useAuth();
+  const { request, selectSchool, selectedSchool } = useAuth();
   const [schools, setSchools] = useState<SchoolSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activating, setActivating] = useState<string | null>(null);
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
-  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const loadSchools = useCallback(async () => {
     setIsLoading(true);
@@ -61,17 +61,6 @@ export default function SchoolsScreen() {
     }
   };
 
-  const logout = async () => {
-    setIsSigningOut(true);
-
-    try {
-      await signOut();
-      router.replace("/sign-in");
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
-
   if (isLoading && !schools) {
     return (
       <AppScreen>
@@ -86,12 +75,9 @@ export default function SchoolsScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={uiStyles.eyebrow}>AWay</Text>
-            <Text style={uiStyles.pageTitle}>Okul ve rol seçin</Text>
-            <Text style={uiStyles.pageDescription}>
-              {session ? `${session.user.firstName} ${session.user.lastName} olarak giriş yaptınız.` : ""}
-            </Text>
+            <Text style={styles.pageTitle}>Okul ve Rol Seçin</Text>
           </View>
-          <PrimaryButton label="Çıkış" tone="ghost" loading={isSigningOut} onPress={() => void logout()} />
+          <AccountMenu />
         </View>
 
         {error ? (
@@ -144,6 +130,7 @@ export default function SchoolsScreen() {
 const styles = StyleSheet.create({
   header: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   headerCopy: { flex: 1, gap: 6 },
+  pageTitle: { color: colors.ink, fontSize: 20, fontWeight: "800", letterSpacing: -0.3 },
   schoolCard: { gap: 14 },
   schoolHeading: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   schoolCopy: { flex: 1, gap: 3 },

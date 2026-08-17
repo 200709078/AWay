@@ -15,7 +15,7 @@ export function HomePage() {
     <main className="dashboard" id="today">
       <section className="dashboard-heading">
         <p className="eyebrow">{today}</p>
-        <h1>{school.school.name} için genel bakış</h1>
+        <h1>{school.school.name}</h1>
         <p>
           Yoklama altyapısı hazırlandıkça günün sınıf ve ders saati durumu
           burada görünür.

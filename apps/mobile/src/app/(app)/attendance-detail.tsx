@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { AppScreen, EmptyState, LoadingView, Notice, Pill, PrimaryButton, uiStyles } from "@/components/ui";
+import { AccountMenu } from "@/components/account-menu";
 import { useAuth } from "@/features/auth/auth-context";
 import {
   createAttendanceEditRequest,
@@ -242,7 +243,10 @@ export default function AttendanceDetailScreen() {
               {formatBusinessDate(detail.lessonDate)} · {detail.lessonNumber}. ders · {formatTimeRange(detail.lessonStartMinute, detail.lessonEndMinute)}
             </Text>
           </View>
-          <PrimaryButton label="Pano" tone="ghost" onPress={() => router.replace("/attendance")} />
+          <View style={styles.headerActions}>
+            <AccountMenu />
+            <PrimaryButton label="Pano" tone="ghost" onPress={() => router.replace("/attendance")} />
+          </View>
         </View>
 
         <View style={[uiStyles.card, styles.stateCard]}>
@@ -438,6 +442,7 @@ function firstRouteValue(value: string | string[] | undefined): string | undefin
 const styles = StyleSheet.create({
   header: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   headerCopy: { flex: 1, gap: 5 },
+  headerActions: { alignItems: "flex-end", gap: 8 },
   stateCard: { gap: 11 },
   stateTitle: { color: colors.ink, fontSize: 20, fontWeight: "800" },
   metaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 4 },

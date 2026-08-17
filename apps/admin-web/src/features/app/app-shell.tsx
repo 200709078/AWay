@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import {
   Navigate,
   NavLink,
@@ -28,11 +29,40 @@ export function SchoolShell() {
   const navigate = useNavigate();
   const { schoolId } = useParams();
   const { request, signOut, user } = useAuth();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const schoolQuery = useQuery({
     queryKey: ["school-context", schoolId],
     queryFn: () => getSchoolContext(request, schoolId!),
     enabled: Boolean(schoolId),
   });
+
+  useEffect(() => {
+    if (!userMenuOpen) {
+      return;
+    }
+
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      if (!userMenuRef.current?.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [userMenuOpen]);
 
   if (!user) {
     return <Navigate to="/sign-in" replace />;
@@ -77,22 +107,63 @@ export function SchoolShell() {
           <NavLink className="school-select" to="/select-school">
             <span>{school.name}</span>
             <small>{school.code} · ADMIN</small>
+            <small className="school-user">
+              {user.firstName} {user.lastName}
+            </small>
           </NavLink>
-          <button
-            className="profile-button"
-            type="button"
-            onClick={() => {
-              void signOut().finally(() =>
-                navigate("/sign-in", { replace: true }),
-              );
-            }}
-          >
-            <span>
-              {user.firstName.slice(0, 1)}
-              {user.lastName.slice(0, 1)}
-            </span>
-            Çıkış
-          </button>
+          <div className="user-menu" ref={userMenuRef}>
+            <button
+              className="profile-button"
+              type="button"
+              aria-expanded={userMenuOpen}
+              aria-haspopup="menu"
+              aria-label="Hesap sahibi menüsü"
+              onClick={() => setUserMenuOpen((open) => !open)}
+            >
+              <span>
+                {user.firstName.slice(0, 1)}
+                {user.lastName.slice(0, 1)}
+              </span>
+            </button>
+            {userMenuOpen ? (
+              <div className="user-menu-panel" role="menu">
+                <button
+                  className="user-menu-item"
+                  type="button"
+                  role="menuitem"
+                  disabled
+                  title="Yakında"
+                >
+                  Profil Ayarları
+                  <small>Yakında</small>
+                </button>
+                <button
+                  className="user-menu-item"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    navigate("/select-school");
+                  }}
+                >
+                  Okul Değiştir
+                </button>
+                <button
+                  className="user-menu-item logout"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    void signOut().finally(() =>
+                      navigate("/sign-in", { replace: true }),
+                    );
+                  }}
+                >
+                  Çıkış
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
       <div className="app-body">
@@ -102,7 +173,7 @@ export function SchoolShell() {
             className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
             to={`/schools/${school.id}/dashboard`}
           >
-            Bugün
+            GİRİŞ
           </NavLink>
           <NavLink
             className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}

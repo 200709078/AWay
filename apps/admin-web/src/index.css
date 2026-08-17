@@ -306,6 +306,12 @@ button:disabled {
   letter-spacing: 0.06em;
 }
 
+.school-select .school-user {
+  color: #3b4f49;
+  font-size: 0.7rem;
+  letter-spacing: 0;
+}
+
 .profile-button {
   align-items: center;
   background: transparent;
@@ -327,6 +333,64 @@ button:disabled {
   height: 2rem;
   justify-content: center;
   width: 2rem;
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-panel {
+  background: #fff;
+  border: 1px solid #dfe6e1;
+  border-radius: 0.65rem;
+  box-shadow: 0 8px 24px rgba(16, 40, 34, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 12rem;
+  padding: 0.35rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.55rem);
+  z-index: 30;
+}
+
+.user-menu-item {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.45rem;
+  color: #2c453d;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 0.82rem;
+  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+}
+
+.user-menu-item:hover:not(:disabled) {
+  background: #f0f6f1;
+}
+
+.user-menu-item:disabled {
+  color: #8a9792;
+  cursor: not-allowed;
+}
+
+.user-menu-item small {
+  color: #a3afa9;
+  font-size: 0.62rem;
+}
+
+.user-menu-item.logout {
+  color: #b0523f;
+}
+
+.user-menu-item.logout:hover:not(:disabled) {
+  background: #fbf0ec;
 }
 
 .app-body {
@@ -935,6 +999,7 @@ button:disabled {
 }
 
 .class-actions {
+  align-items: center;
   display: flex;
   gap: 0.45rem;
   justify-content: end;
@@ -1191,6 +1256,13 @@ button:disabled {
   margin: 0.75rem 0 0;
 }
 
+.edit-phone-line {
+  color: #385149 !important;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
 .account-note {
   align-items: center;
   display: flex;
@@ -1220,6 +1292,36 @@ button:disabled {
 .dialog-form select:focus {
   border-color: #287062;
   box-shadow: 0 0 0 4px rgba(40, 112, 98, 0.12);
+}
+
+.dialog-form textarea {
+  background: #fff;
+  border: 1px solid #cbd9d1;
+  border-radius: 0.7rem;
+  color: #18322b;
+  font: inherit;
+  min-height: 4.4rem;
+  outline: none;
+  padding: 0.7rem 0.8rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.dialog-form textarea:focus {
+  border-color: #287062;
+  box-shadow: 0 0 0 4px rgba(40, 112, 98, 0.12);
+}
+
+.address-field {
+  display: grid;
+  gap: 0.42rem;
+  margin-top: 0.8rem;
+}
+
+.optional-tag {
+  color: #8a9792;
+  font-size: 0.72rem;
+  font-weight: 500;
 }
 
 .field-note {
@@ -1946,6 +2048,13 @@ button.attendance-slot:hover {
   font-feature-settings: "tnum";
   font-size: 0.82rem !important;
   font-variant-numeric: tabular-nums;
+}
+
+.teacher-address {
+  color: #78877f;
+  display: block;
+  font-size: 0.76rem;
+  margin-top: 0.25rem;
 }
 
 .self-teacher-access {

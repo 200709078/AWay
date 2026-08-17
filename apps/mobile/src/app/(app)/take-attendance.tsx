@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { AppScreen, EmptyState, LoadingView, Notice, Pill, PrimaryButton, uiStyles } from "@/components/ui";
+import { AccountMenu } from "@/components/account-menu";
 import { useAuth } from "@/features/auth/auth-context";
 import {
   createAttendance,
@@ -265,7 +266,10 @@ export default function TakeAttendanceScreen() {
               {formatBusinessDate(context.date)} · {context.lessonPeriod.lessonNumber}. ders · {formatTimeRange(context.lessonPeriod.startMinute, context.lessonPeriod.endMinute)}
             </Text>
           </View>
-          <PrimaryButton label="Pano" tone="ghost" onPress={() => router.replace("/attendance")} />
+          <View style={styles.headerActions}>
+            <AccountMenu />
+            <PrimaryButton label="Pano" tone="ghost" onPress={() => router.replace("/attendance")} />
+          </View>
         </View>
 
         <Notice tone="information">
@@ -341,6 +345,7 @@ function firstRouteValue(value: string | string[] | undefined): string | undefin
 const styles = StyleSheet.create({
   header: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   headerCopy: { flex: 1, gap: 5 },
+  headerActions: { alignItems: "flex-end", gap: 8 },
   summaryCard: { flexDirection: "row", justifyContent: "space-around", paddingVertical: 18 },
   summaryValue: { color: colors.ink, fontSize: 25, fontWeight: "800", textAlign: "center" },
   studentsCard: { gap: 14 },

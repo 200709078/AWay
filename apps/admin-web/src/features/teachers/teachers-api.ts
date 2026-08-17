@@ -7,9 +7,10 @@ export interface TeacherSummary {
   firstName: string;
   lastName: string;
   isCurrentUser: boolean;
+  address: string | null;
   account: {
     status: "UNVERIFIED" | "VERIFIED";
-    phoneMasked: string;
+    phone: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -27,6 +28,11 @@ export interface CreateTeacherInput {
   firstName: string;
   lastName: string;
   phone: string;
+  address?: string;
+}
+
+export interface UpdateTeacherInput {
+  address?: string;
 }
 
 export function getTeachers(
@@ -61,6 +67,19 @@ export function createTeacher(
 ): Promise<TeacherSummary> {
   return request<TeacherSummary>(`/schools/${schoolId}/teachers`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTeacher(
+  request: AuthenticatedRequest,
+  schoolId: string,
+  teacherId: string,
+  input: UpdateTeacherInput,
+): Promise<TeacherSummary> {
+  return request<TeacherSummary>(`/schools/${schoolId}/teachers/${teacherId}`, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });

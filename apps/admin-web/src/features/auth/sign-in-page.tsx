@@ -110,7 +110,13 @@ export function SignInPage() {
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel"
-                placeholder="05xx xxx xx xx"
+                onBlur={() => {
+                  if (phone === "05") setPhone("");
+                }}
+                onFocus={() => {
+                  if (!phone) setPhone("05");
+                }}
+                placeholder="05xxxxxxxxx"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 required

@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Max,
   MaxLength,
@@ -29,4 +30,9 @@ export class UpdateStudentDto {
   @IsNotEmpty({ message: 'Öğrenci soyadı gerekli.' })
   @MaxLength(80, { message: 'Öğrenci soyadı en fazla 80 karakter olabilir.' })
   lastName: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'Adres en fazla 200 karakter olabilir.' })
+  address?: string;
 }

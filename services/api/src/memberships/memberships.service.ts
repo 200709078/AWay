@@ -10,6 +10,7 @@ import { MembershipRole, type Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../database/prisma/prisma.service';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { ListTeachersQueryDto } from './dto/list-teachers-query.dto';
+import { UpdateTeacherDto } from './dto/update-teacher.dto';
 
 interface MembershipActor {
   userId: string;
@@ -21,6 +22,7 @@ interface TeacherRecord {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+  address: string | null;
   user: {
     id: string;
     firstName: string;
@@ -35,6 +37,7 @@ const teacherSummarySelect = {
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
+  address: true,
   user: {
     select: {
       id: true,
@@ -112,6 +115,7 @@ export class MembershipsService {
       firstName: this.normalizeName(dto.firstName, 'Öğretmen adı'),
       lastName: this.normalizeName(dto.lastName, 'Öğretmen soyadı'),
       phone: this.normalizePhone(dto.phone),
+      address: this.normalizeAddress(dto.address),
     };
 
     try {
@@ -148,6 +152,7 @@ export class MembershipsService {
             schoolId,
             userId: user.id,
             role: MembershipRole.TEACHER,
+            address: input.address,
           },
           select: teacherSummarySelect,
         });
@@ -175,6 +180,85 @@ export class MembershipsService {
 
       throw error;
     }
+  }
+
+  async updateTeacher(
+    schoolId: string,
+    teacherId: string,
+    dto: UpdateTeacherDto,
+    actor: MembershipActor,
+  ) {
+    return this.withSerializableRetry(async (tx) => {
+      await this.lockActiveSchool(tx, schoolId);
+      const currentActor = await this.requireCurrentAdminActor(
+        tx,
+        schoolId,
+        actor,
+      );
+      const teacher = await this.findTeacherMembershipByIdForUpdate(
+        tx,
+        schoolId,
+        teacherId,
+      );
+
+      if (!teacher) {
+        throw new NotFoundException('Öğretmen bulunamadı.');
+      }
+
+      if (teacher.deletedAt) {
+        throw new ConflictException(
+          'Arşivlenmiş öğretmen düzenlenemez. Önce geri yükleyin.',
+        );
+      }
+
+      const address =
+        dto.address === undefined ? undefined : this.normalizeAddress(dto.address);
+
+      if (address === undefined || address === teacher.address) {
+        const unchanged = await tx.schoolMembership.findUniqueOrThrow({
+          where: { id: teacher.id },
+          select: teacherSummarySelect,
+        });
+
+        return this.toTeacherSummary(unchanged, currentActor.userId);
+      }
+
+      const update = await tx.schoolMembership.updateMany({
+        where: {
+          id: teacher.id,
+          schoolId,
+          role: MembershipRole.TEACHER,
+          deletedAt: null,
+        },
+        data: { address },
+      });
+
+      if (update.count === 0) {
+        throw new NotFoundException('Öğretmen bulunamadı.');
+      }
+
+      const updated = await tx.schoolMembership.findUniqueOrThrow({
+        where: { id: teacher.id },
+        select: teacherSummarySelect,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          schoolId,
+          actorUserId: currentActor.userId,
+          actorMembershipId: currentActor.membershipId,
+          action: 'TEACHER_UPDATED',
+          entityType: 'SchoolMembership',
+          entityId: updated.id,
+          metadata: {
+            previous: { address: teacher.address },
+            next: { address: updated.address },
+          },
+        },
+      });
+
+      return this.toTeacherSummary(updated, currentActor.userId);
+    });
   }
 
   async archiveTeacher(
@@ -383,9 +467,9 @@ export class MembershipsService {
     teacherId: string,
   ) {
     const memberships = await prisma.$queryRaw<
-      Array<{ id: string; userId: string; deletedAt: Date | null }>
+      Array<{ id: string; userId: string; deletedAt: Date | null; address: string | null }>
     >`
-      SELECT "id", "userId", "deletedAt"
+      SELECT "id", "userId", "deletedAt", "address"
       FROM "SchoolMembership"
       WHERE "id" = ${teacherId}
         AND "schoolId" = ${schoolId}
@@ -432,9 +516,10 @@ export class MembershipsService {
       createdAt: teacher.createdAt,
       updatedAt: teacher.updatedAt,
       deletedAt: teacher.deletedAt,
+      address: teacher.address,
       account: {
         status: teacher.user.phoneVerifiedAt ? 'VERIFIED' : 'UNVERIFIED',
-        phoneMasked: this.maskPhone(teacher.user.phone),
+        phone: teacher.user.phone,
       },
     };
   }
@@ -453,20 +538,30 @@ export class MembershipsService {
     return normalized;
   }
 
+  private normalizeAddress(value: string | undefined | null): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const normalized = value.trim().replace(/\s+/g, ' ');
+
+    if (!normalized) {
+      return null;
+    }
+
+    if (normalized.length > 200) {
+      throw new BadRequestException('Adres en fazla 200 karakter olabilir.');
+    }
+
+    return normalized;
+  }
+
   private normalizePhone(phone: string): string {
     try {
       return normalizePhone(phone, 'TR');
     } catch {
       throw new BadRequestException('Geçersiz telefon numarası.');
     }
-  }
-
-  private maskPhone(phone: string): string {
-    if (phone.startsWith('+90') && phone.length === 13) {
-      return `${phone.slice(0, 3)} ${phone.slice(3, 6)} ••• •• ${phone.slice(-2)}`;
-    }
-
-    return `${phone.slice(0, Math.min(4, phone.length))} ••• ${phone.slice(-2)}`;
   }
 
   private async withSerializableRetry<T>(

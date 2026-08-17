@@ -11,6 +11,7 @@ export interface StudentSummary {
   number: number;
   firstName: string;
   lastName: string;
+  address: string | null;
   class: {
     id: string;
     name: string;
@@ -45,6 +46,7 @@ export interface CreateStudentInput {
   firstName: string;
   lastName: string;
   phone?: string;
+  address?: string;
 }
 
 export interface UpdateStudentInput {
@@ -52,6 +54,7 @@ export interface UpdateStudentInput {
   number: number;
   firstName: string;
   lastName: string;
+  address?: string;
 }
 
 export function getStudents(

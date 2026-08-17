@@ -418,6 +418,9 @@ function StudentRow({
         <strong>
           {student.firstName} {student.lastName}
         </strong>
+        {student.address ? (
+          <span className="teacher-address">{student.address}</span>
+        ) : null}
       </td>
       <td>{student.class.name}</td>
       <td>
@@ -492,7 +495,7 @@ function StudentForm({
   const [firstName, setFirstName] = useState(student?.firstName ?? "");
   const [lastName, setLastName] = useState(student?.lastName ?? "");
   const [classId, setClassId] = useState(student?.class.id ?? classes[0]?.id ?? "");
-  const [prepareAccount, setPrepareAccount] = useState(false);
+  const [address, setAddress] = useState(student?.address ?? "");
   const [phone, setPhone] = useState("");
   const [localError, setLocalError] = useState("");
   const isEditing = form.mode === "edit";
@@ -502,6 +505,7 @@ function StudentForm({
     const normalizedNumber = Number(number);
     const normalizedFirstName = firstName.trim().replace(/\s+/g, " ");
     const normalizedLastName = lastName.trim().replace(/\s+/g, " ");
+    const normalizedAddress = address.trim().replace(/\s+/g, " ");
 
     if (!Number.isInteger(normalizedNumber) || normalizedNumber < 1) {
       setLocalError("Pozitif bir öğrenci numarası yazın.");
@@ -513,17 +517,18 @@ function StudentForm({
       return;
     }
 
-    if (!isEditing && prepareAccount && !phone.trim()) {
-      setLocalError("Telefonla hesap hazırlamak için telefon numarası gerekli.");
-      return;
-    }
-
+    const normalizedPhone = phone.trim();
     const input = {
       classId,
       number: normalizedNumber,
       firstName: normalizedFirstName,
       lastName: normalizedLastName,
-      ...(!isEditing && prepareAccount ? { phone: phone.trim() } : {}),
+      ...(!isEditing &&
+      normalizedPhone &&
+      normalizedPhone !== "05"
+        ? { phone: normalizedPhone }
+        : {}),
+      ...(normalizedAddress || isEditing ? { address: normalizedAddress } : {}),
     };
     onSubmit(input);
   }
@@ -615,42 +620,54 @@ function StudentForm({
             </label>
           </div>
 
+          <label className="address-field" htmlFor="student-address">
+            Adres <span className="optional-tag">(isteğe bağlı)</span>
+            <textarea
+              id="student-address"
+              maxLength={200}
+              placeholder="Örn. Atatürk Mah. 15. Sok. No: 4"
+              value={address}
+              onChange={(event) => {
+                setAddress(event.target.value);
+                setLocalError("");
+              }}
+              disabled={isSubmitting}
+            />
+          </label>
+
           {!isEditing ? (
-            <div className="account-setup">
-              <label className="checkbox-label">
+            <>
+              <label className="phone-field" htmlFor="student-create-phone">
+                Telefon numarası{" "}
+                <span className="optional-tag">(isteğe bağlı)</span>
                 <input
-                  type="checkbox"
-                  checked={prepareAccount}
+                  id="student-create-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  onBlur={() => {
+                    if (phone === "05") setPhone("");
+                  }}
+                  onFocus={() => {
+                    if (!phone) setPhone("05");
+                  }}
+                  placeholder="05xxxxxxxxx"
+                  value={phone}
                   onChange={(event) => {
-                    setPrepareAccount(event.target.checked);
+                    setPhone(event.target.value);
                     setLocalError("");
                   }}
                   disabled={isSubmitting}
                 />
-                <span>Bu öğrenci için telefonla giriş hesabı hazırla</span>
               </label>
-              {prepareAccount ? (
-                <label className="phone-field">
-                  Telefon numarası
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder="05xx xxx xx xx"
-                    value={phone}
-                    onChange={(event) => {
-                      setPhone(event.target.value);
-                      setLocalError("");
-                    }}
-                    disabled={isSubmitting}
-                  />
-                </label>
-              ) : null}
-              <p>
-                Bu işlem SMS göndermez. Telefon sahibi ilk girişinde OTP ile
-                hesabını doğrular; mevcut global hesap bilgileri değişmez.
-              </p>
-            </div>
+              <div className="account-setup">
+                <p>
+                  Telefon girilirse bu öğrenci için telefonla giriş hesabı
+                  hazırlanır. SMS gönderilmez; ilk girişte OTP ile doğrulanır,
+                  mevcut global hesap bilgileri değişmez.
+                </p>
+              </div>
+            </>
           ) : (
             <div className="account-note">
               <AccountBadge account={student!.account} />

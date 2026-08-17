@@ -94,6 +94,7 @@ model SchoolMembership {
   schoolId  String
   userId    String
   role      MembershipRole
+  address   String?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   deletedAt DateTime?
@@ -152,6 +153,7 @@ model Student {
   number    Int
   firstName String
   lastName  String
+  address   String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?

@@ -52,8 +52,14 @@ export default function SignInScreen() {
               editable={!isSubmitting}
               inputMode="tel"
               keyboardType="phone-pad"
+              onBlur={() => {
+                if (phone === "05") setPhone("");
+              }}
               onChangeText={setPhone}
-              placeholder="05xx xxx xx xx"
+              onFocus={() => {
+                if (!phone) setPhone("05");
+              }}
+              placeholder="05xxxxxxxxx"
               placeholderTextColor="#7A8781"
               style={styles.input}
               textContentType="telephoneNumber"

@@ -25,6 +25,7 @@ interface StudentRecord {
   number: number;
   firstName: string;
   lastName: string;
+  address: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -43,6 +44,7 @@ const studentSummarySelect = {
   number: true,
   firstName: true,
   lastName: true,
+  address: true,
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
@@ -112,6 +114,8 @@ export class StudentsService {
       firstName: this.normalizeName(dto.firstName, 'Öğrenci adı'),
       lastName: this.normalizeName(dto.lastName, 'Öğrenci soyadı'),
       phone: dto.phone === undefined ? undefined : this.normalizePhone(dto.phone),
+      address:
+        dto.address === undefined ? undefined : this.normalizeAddress(dto.address),
     };
 
     try {
@@ -141,6 +145,7 @@ export class StudentsService {
             number: input.number,
             firstName: input.firstName,
             lastName: input.lastName,
+            address: input.address,
           },
           select: studentSummarySelect,
         });
@@ -185,6 +190,8 @@ export class StudentsService {
       number: this.normalizeNumber(dto.number),
       firstName: this.normalizeName(dto.firstName, 'Öğrenci adı'),
       lastName: this.normalizeName(dto.lastName, 'Öğrenci soyadı'),
+      address:
+        dto.address === undefined ? undefined : this.normalizeAddress(dto.address),
     };
 
     try {
@@ -203,6 +210,7 @@ export class StudentsService {
             number: true,
             firstName: true,
             lastName: true,
+            address: true,
           },
         });
 
@@ -218,6 +226,7 @@ export class StudentsService {
         );
 
         const changed =
+          (input.address !== undefined && existing.address !== input.address) ||
           existing.classId !== input.classId ||
           existing.number !== input.number ||
           existing.firstName !== input.firstName ||
@@ -264,12 +273,14 @@ export class StudentsService {
                 number: existing.number,
                 firstName: existing.firstName,
                 lastName: existing.lastName,
+                address: existing.address,
               },
               next: {
                 classId: student.class.id,
                 number: student.number,
                 firstName: student.firstName,
                 lastName: student.lastName,
+                address: student.address,
               },
             },
           },
@@ -708,6 +719,7 @@ export class StudentsService {
       number: student.number,
       firstName: student.firstName,
       lastName: student.lastName,
+      address: student.address,
       class: student.class,
       createdAt: student.createdAt,
       updatedAt: student.updatedAt,
@@ -730,6 +742,24 @@ export class StudentsService {
 
     if (normalized.length > 80) {
       throw new BadRequestException(`${label} en fazla 80 karakter olabilir.`);
+    }
+
+    return normalized;
+  }
+
+  private normalizeAddress(value: string | undefined | null): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const normalized = value.trim().replace(/\s+/g, ' ');
+
+    if (!normalized) {
+      return null;
+    }
+
+    if (normalized.length > 200) {
+      throw new BadRequestException('Adres en fazla 200 karakter olabilir.');
     }
 
     return normalized;

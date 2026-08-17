@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Redirect, router } from "expo-router";
 import { AppScreen, EmptyState, LoadingView, Notice, Pill, PrimaryButton, uiStyles } from "@/components/ui";
+import { AccountMenu } from "@/components/account-menu";
 import { useAuth } from "@/features/auth/auth-context";
 import { getAttendanceBoard, type AttendanceBoard, type AttendanceSummary } from "@/features/attendance/attendance-api";
 import { getSchoolContext } from "@/features/schools/schools-api";
@@ -11,12 +12,11 @@ import { colors, messageForError, roleLabel } from "@/lib/presentation";
 import { isAttendanceRole } from "@/lib/types";
 
 export default function AttendanceScreen() {
-  const { request, selectedSchool, clearSelectedSchool, signOut: signOutFromAuth } = useAuth();
+  const { request, selectedSchool, clearSelectedSchool } = useAuth();
   const [date, setDate] = useState(todayInIstanbul);
   const [board, setBoard] = useState<AttendanceBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSigningOut, setIsSigningOut] = useState(false);
   const boardRequestSequenceRef = useRef(0);
 
   const schoolId = selectedSchool?.school.id;
@@ -105,17 +105,6 @@ export default function AttendanceScreen() {
     setDate(todayInIstanbul());
   };
 
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-
-    try {
-      await signOutFromAuth();
-      router.replace("/sign-in");
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
-
   if (!selectedSchool || !selectedRoleCanTakeAttendance) {
     return <Redirect href="/schools" />;
   }
@@ -134,18 +123,17 @@ export default function AttendanceScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={uiStyles.eyebrow}>{selectedSchool.school.name}</Text>
-            <Text style={uiStyles.pageTitle}>Yoklama panosu</Text>
-            <Text style={uiStyles.pageDescription}>{roleLabel(selectedSchool.selectedRole)} görünümü</Text>
+            <Text style={styles.pageTitle}>Yoklama Panosu</Text>
+            <Text style={uiStyles.pageDescription}>{roleLabel(selectedSchool.selectedRole)}</Text>
           </View>
           <View style={styles.headerActions}>
-            <PrimaryButton label="Okul" tone="ghost" onPress={() => router.replace("/schools")} />
-            <PrimaryButton label="Çıkış" tone="ghost" loading={isSigningOut} onPress={() => void handleSignOut()} />
+            <AccountMenu />
           </View>
         </View>
 
         <View style={[uiStyles.card, styles.dateCard]}>
           <View style={styles.dateCopy}>
-            <Text style={uiStyles.eyebrow}>İstanbul tarihi</Text>
+            <Text style={uiStyles.eyebrow}>Tarih</Text>
             <Text style={styles.dateTitle}>{formatBusinessDate(date)}</Text>
           </View>
           <View style={styles.dateActions}>
@@ -287,6 +275,7 @@ function AttendanceSlot({
 const styles = StyleSheet.create({
   header: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   headerCopy: { flex: 1, gap: 5 },
+  pageTitle: { color: colors.ink, fontSize: 20, fontWeight: "800", letterSpacing: -0.3 },
   headerActions: { alignItems: "flex-end", gap: 0 },
   dateCard: { gap: 14 },
   dateCopy: { gap: 3 },

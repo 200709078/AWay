@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateTeacherDto {
   @IsString()
@@ -17,4 +17,9 @@ export class CreateTeacherDto {
   @IsNotEmpty({ message: 'Telefon numarası gerekli.' })
   @MaxLength(32, { message: 'Telefon numarası çok uzun.' })
   phone: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'Adres en fazla 200 karakter olabilir.' })
+  address?: string;
 }

@@ -35,4 +35,9 @@ export class CreateStudentDto {
   @IsString()
   @MaxLength(32, { message: 'Telefon numarası çok uzun.' })
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'Adres en fazla 200 karakter olabilir.' })
+  address?: string;
 }

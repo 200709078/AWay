@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -23,6 +24,7 @@ import {
 } from '../common/decorators/current-user.decorator';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { ListTeachersQueryDto } from './dto/list-teachers-query.dto';
+import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { MembershipsService } from './memberships.service';
 
 @Controller('schools/:schoolId/teachers')
@@ -52,6 +54,21 @@ export class MembershipsController {
   ) {
     return this.membershipsService.createTeacher(
       access.school.id,
+      dto,
+      this.actor(access, user),
+    );
+  }
+
+  @Patch(':teacherId')
+  updateTeacher(
+    @Param('teacherId') teacherId: string,
+    @Body() dto: UpdateTeacherDto,
+    @CurrentSchoolAccess() access: SchoolAccess,
+    @CurrentUser() user: CurrentUserType,
+  ) {
+    return this.membershipsService.updateTeacher(
+      access.school.id,
+      teacherId,
       dto,
       this.actor(access, user),
     );
