@@ -119,7 +119,7 @@ export function ClassesPage() {
           type="button"
           onClick={() => openForm({ mode: "create" })}
         >
-          <span aria-hidden="true">+</span> Sınıf ekle
+          <span aria-hidden="true">+</span> Sınıf Ekle
         </button>
       </header>
 
@@ -127,7 +127,7 @@ export function ClassesPage() {
         <div className="list-toolbar">
           <div>
             <h2 id="class-list-title">
-              {status === "active" ? "Aktif sınıflar" : "Arşivlenmiş sınıflar"}
+              {status === "active" ? "Aktif Sınıflar" : "Arşivlenmiş Sınıflar"}
             </h2>
             <p>
               {status === "active"
@@ -480,7 +480,7 @@ function EmptyClasses({
       </p>
       {status === "active" ? (
         <button className="primary-action" type="button" onClick={onCreate}>
-          İlk sınıfı ekle
+          İlk Sınıfı Ekle
         </button>
       ) : null}
     </div>

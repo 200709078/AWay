@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "@/components/text";
 import { router } from "expo-router";
 import { AppScreen, EmptyState, LoadingView, Notice, Pill, PrimaryButton, uiStyles } from "@/components/ui";
 import { AccountMenu } from "@/components/account-menu";

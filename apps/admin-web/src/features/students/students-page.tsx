@@ -185,7 +185,7 @@ export function StudentsPage() {
           disabled={!hasClasses || classesQuery.isPending}
           title={!hasClasses ? "Önce en az bir aktif sınıf ekleyin." : undefined}
         >
-          <span aria-hidden="true">+</span> Öğrenci ekle
+          <span aria-hidden="true">+</span> Öğrenci Ekle
         </button>
       </header>
 
@@ -206,7 +206,7 @@ export function StudentsPage() {
         <div className="list-toolbar student-list-toolbar">
           <div>
             <h2 id="student-list-title">
-              {status === "active" ? "Aktif öğrenciler" : "Arşivlenmiş öğrenciler"}
+              {status === "active" ? "Aktif Öğrenciler" : "Arşivlenmiş Öğrenciler"}
             </h2>
             <p>
               {status === "active"
@@ -545,7 +545,7 @@ function StudentForm({
           <div>
             <p className="eyebrow">ÖĞRENCİ YÖNETİMİ</p>
             <h2 id="student-form-title">
-              {isEditing ? "Öğrenciyi düzenle" : "Yeni öğrenci ekle"}
+              {isEditing ? "Öğrenciyi düzenle" : "Yeni Öğrenci Ekle"}
             </h2>
           </div>
           <button
@@ -638,7 +638,7 @@ function StudentForm({
           {!isEditing ? (
             <>
               <label className="phone-field" htmlFor="student-create-phone">
-                Telefon numarası{" "}
+                Telefon Numarası{" "}
                 <span className="optional-tag">(isteğe bağlı)</span>
                 <input
                   id="student-create-phone"
@@ -756,7 +756,7 @@ function ProvisionAccountDialog({
         </div>
         <form className="dialog-form" onSubmit={submit}>
           <label>
-            Telefon numarası
+            Telefon Numarası
             <input
               autoFocus
               type="tel"
@@ -896,7 +896,7 @@ function EmptyStudents({
         </button>
       ) : status === "active" && canCreate ? (
         <button className="primary-action" type="button" onClick={onCreate}>
-          İlk öğrenciyi ekle
+          İlk Öğrenciyi Ekle
         </button>
       ) : null}
     </div>

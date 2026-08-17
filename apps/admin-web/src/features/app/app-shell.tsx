@@ -204,7 +204,7 @@ export function SchoolShell() {
             className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
             to={`/schools/${school.id}/lesson-periods`}
           >
-            Ders saatleri
+            Ders Saatleri
           </NavLink>
         </nav>
         <Outlet context={{ school: schoolQuery.data }} />

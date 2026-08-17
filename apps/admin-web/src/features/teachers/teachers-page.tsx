@@ -140,7 +140,7 @@ export function TeachersPage() {
             setIsFormOpen(true);
           }}
         >
-          <span aria-hidden="true">+</span> Öğretmen ekle
+          <span aria-hidden="true">+</span> Öğretmen Ekle
         </button>
       </header>
 
@@ -148,7 +148,7 @@ export function TeachersPage() {
         <div className="list-toolbar student-list-toolbar">
           <div>
             <h2 id="teacher-list-title">
-              {status === "active" ? "Aktif öğretmenler" : "Erişimi kapatılmış öğretmenler"}
+              {status === "active" ? "Aktif Öğretmenler" : "Erişimi Kapatılmış Öğretmenler"}
             </h2>
             <p>
               {status === "active"
@@ -275,7 +275,7 @@ export function TeachersPage() {
                                   });
                                 }}
                               >
-                                Erişimi kapat
+                                Erişimi Kapat
                               </button>
                             )}
                           </>
@@ -411,7 +411,7 @@ function TeacherForm({
         <div className="dialog-heading">
           <div>
             <p className="eyebrow">ÖĞRETMEN ERİŞİMİ</p>
-            <h2 id="teacher-form-title">Öğretmen ekle</h2>
+            <h2 id="teacher-form-title">Öğretmen Ekle</h2>
           </div>
           <button
             className="icon-button"
@@ -454,7 +454,7 @@ function TeacherForm({
             </label>
           </div>
           <label className="phone-field" htmlFor="teacher-phone">
-            Telefon numarası
+            Telefon Numarası
             <input
               id="teacher-phone"
               type="tel"
@@ -664,8 +664,8 @@ function TeacherConfirmation({
             {isSubmitting
               ? "İşleniyor…"
               : isArchiving
-                ? "Erişimi kapat"
-                : "Erişimi geri yükle"}
+                ? "Erişimi Kapat"
+                : "Erişimi Geri Yükle"}
           </button>
         </div>
       </section>
@@ -759,7 +759,7 @@ function TeacherEmptyState({
         </button>
       ) : isActive ? (
         <button className="primary-action" type="button" onClick={onCreate}>
-          İlk öğretmeni ekle
+          İlk Öğretmeni Ekle
         </button>
       ) : null}
     </div>

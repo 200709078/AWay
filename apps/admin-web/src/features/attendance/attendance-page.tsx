@@ -261,7 +261,7 @@ function AttendanceBoardView({
       <section className="management-card attendance-board-card" aria-labelledby="attendance-board-title">
         <div className="list-toolbar attendance-board-toolbar">
           <div>
-            <h2 id="attendance-board-title">{dayLabel(board.dayOfWeek)} yoklama panosu</h2>
+            <h2 id="attendance-board-title">{dayLabel(board.dayOfWeek)} Yoklama Panosu</h2>
             <p>
               Hücredeki bir kayıt, o sınıfın ilgili ders saati için tekil
               yoklamasıdır. Boş bir slot yalnız uygun günlerde gönderilebilir.
@@ -392,8 +392,8 @@ function AttendanceSlot({
   if (isFutureDate) {
     return (
       <div className="attendance-slot unavailable">
-        <strong>Gelecek gün</strong>
-        <span>Yoklama gönderilemez</span>
+        <strong>Gelecek Gün</strong>
+        <span>Yoklama Gönderilemez</span>
       </div>
     );
   }
@@ -411,7 +411,7 @@ function AttendanceSlot({
     return (
       <div className="attendance-slot unavailable">
         <strong>Ders saati yok</strong>
-        <span>Önce saat tanımlayın</span>
+        <span>Önce saat tanımlayın.</span>
       </div>
     );
   }

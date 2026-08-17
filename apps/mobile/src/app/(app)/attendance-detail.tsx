@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Text } from "@/components/text";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { AppScreen, EmptyState, LoadingView, Notice, Pill, PrimaryButton, uiStyles } from "@/components/ui";
 import { AccountMenu } from "@/components/account-menu";
@@ -19,6 +20,8 @@ import { isAttendanceRole } from "@/lib/types";
 export default function AttendanceDetailScreen() {
   const params = useLocalSearchParams<{ attendanceId?: string }>();
   const { request, selectedSchool, clearSelectedSchool } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
+  const reasonInputRef = useRef<TextInput>(null);
   const [detail, setDetail] = useState<AttendanceDetail | null>(null);
   const [absentNumbers, setAbsentNumbers] = useState<Set<number>>(new Set());
   const [reason, setReason] = useState("");
@@ -94,6 +97,23 @@ export default function AttendanceDetailScreen() {
 
       return next;
     });
+  };
+
+  const scrollReasonInputIntoView = () => {
+    const input = reasonInputRef.current;
+    const scrollView = scrollRef.current;
+    if (!input || !scrollView) return;
+    const nativeScrollRef = scrollView.getNativeScrollRef();
+    if (!nativeScrollRef) return;
+    input.measureLayout(
+      nativeScrollRef,
+      (_x, y) => {
+        scrollView.scrollTo({ y: Math.max(0, y - 90), animated: true });
+      },
+      () => {
+        // Ölçüm başarısız olursa kaydırmayı atla; kullanıcı elle kaydırabilir.
+      },
+    );
   };
 
   const save = async () => {
@@ -234,7 +254,15 @@ export default function AttendanceDetailScreen() {
 
   return (
     <AppScreen>
-      <ScrollView contentContainerStyle={uiStyles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        behavior={Platform.select({ ios: "padding", android: "height", default: undefined })}
+        style={styles.flex}
+      >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={uiStyles.content}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={uiStyles.eyebrow}>{detail.className}</Text>
@@ -286,11 +314,18 @@ export default function AttendanceDetailScreen() {
               Gerekçenizi gönderin. Yönetici onaylarsa size 15 dakikalık tek kullanımlık düzenleme izni açılır.
             </Text>
             <TextInput
+              ref={reasonInputRef}
               accessibilityLabel="Düzenleme talebi gerekçesi"
               editable={operation === null}
               maxLength={500}
               multiline
+              onChange={(event) => {
+                if (Platform.OS === "android") scrollReasonInputIntoView();
+              }}
               onChangeText={setReason}
+              onFocus={(event) => {
+                if (Platform.OS === "android") scrollReasonInputIntoView();
+              }}
               placeholder="Düzeltme gerekçenizi yazın"
               placeholderTextColor="#7A8781"
               style={styles.reasonInput}
@@ -346,7 +381,7 @@ export default function AttendanceDetailScreen() {
                   style={({ pressed }) => [styles.studentRow, isAbsent && styles.studentRowAbsent, pressed && detail.canEdit && styles.studentRowPressed]}
                 >
                   <View style={[styles.checkbox, isAbsent && styles.checkboxChecked, !detail.canEdit && styles.checkboxReadonly]}>
-                    {isAbsent ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                    {isAbsent ? <View style={styles.checkboxMark} /> : null}
                   </View>
                   <Text style={styles.studentNumber}>{student.number}</Text>
                   <Text style={styles.studentName}>{student.firstName} {student.lastName}</Text>
@@ -367,7 +402,8 @@ export default function AttendanceDetailScreen() {
           />
         ) : null}
         <PrimaryButton label="Ayrıntıyı yenile" tone="secondary" loading={isLoading} onPress={() => void loadDetail()} />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </AppScreen>
   );
 }
@@ -440,6 +476,7 @@ function firstRouteValue(value: string | string[] | undefined): string | undefin
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   header: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   headerCopy: { flex: 1, gap: 5 },
   headerActions: { alignItems: "flex-end", gap: 8 },
@@ -464,7 +501,7 @@ const styles = StyleSheet.create({
   checkbox: { alignItems: "center", borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 24, justifyContent: "center", width: 24 },
   checkboxReadonly: { opacity: 0.7 },
   checkboxChecked: { backgroundColor: colors.danger, borderColor: colors.danger },
-  checkboxMark: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+  checkboxMark: { borderBottomWidth: 3, borderColor: "#FFFFFF", borderLeftWidth: 3, height: 7, transform: [{ rotate: "-45deg" }], width: 14 },
   studentNumber: { color: colors.muted, fontSize: 13, fontWeight: "700", minWidth: 34, textAlign: "right" },
   studentName: { color: colors.ink, flex: 1, fontSize: 15, fontWeight: "600" },
   studentStatus: { color: colors.success, fontSize: 12, fontWeight: "700" },

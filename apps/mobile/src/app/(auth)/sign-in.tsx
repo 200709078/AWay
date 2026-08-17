@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Text } from "@/components/text";
 import { router } from "expo-router";
 import { AppScreen, Notice, PrimaryButton, uiStyles } from "@/components/ui";
 import { useAuth } from "@/features/auth/auth-context";
@@ -10,6 +11,25 @@ export default function SignInScreen() {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  const scrollPhoneInputIntoView = () => {
+    const input = inputRef.current;
+    const scrollView = scrollRef.current;
+    if (!input || !scrollView) return;
+    const nativeScrollRef = scrollView.getNativeScrollRef();
+    if (!nativeScrollRef) return;
+    input.measureLayout(
+      nativeScrollRef,
+      (_x, y) => {
+        scrollView.scrollTo({ y: Math.max(0, y - 90), animated: true });
+      },
+      () => {
+        // Ölçüm başarısız olursa kaydırmayı atla; kullanıcı elle kaydırabilir.
+      },
+    );
+  };
 
   const submit = async () => {
     setError(null);
@@ -28,10 +48,14 @@ export default function SignInScreen() {
   return (
     <AppScreen>
       <KeyboardAvoidingView
-        behavior={Platform.select({ ios: "padding", default: undefined })}
+        behavior={Platform.select({ ios: "padding", android: "height", default: undefined })}
         style={styles.flex}
       >
-        <ScrollView contentContainerStyle={[uiStyles.content, styles.content]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[uiStyles.content, styles.content]}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.hero}>
             <Text style={uiStyles.eyebrow}>AWay</Text>
             <Text style={styles.title}>Yoklamaya güvenle bağlanın.</Text>
@@ -41,11 +65,12 @@ export default function SignInScreen() {
           </View>
 
           <View style={[uiStyles.card, styles.form]}>
-            <Text style={uiStyles.sectionTitle}>Telefon numarası</Text>
+            <Text style={uiStyles.sectionTitle}>Telefon Numarası</Text>
             <Text style={uiStyles.muted}>
               Türkiye numaranızı 05xx xxx xx xx veya +90 biçiminde yazabilirsiniz.
             </Text>
             <TextInput
+              ref={inputRef}
               accessibilityLabel="Telefon numarası"
               autoComplete="tel"
               autoFocus
@@ -58,6 +83,7 @@ export default function SignInScreen() {
               onChangeText={setPhone}
               onFocus={() => {
                 if (!phone) setPhone("05");
+                if (Platform.OS === "android") scrollPhoneInputIntoView();
               }}
               placeholder="05xxxxxxxxx"
               placeholderTextColor="#7A8781"

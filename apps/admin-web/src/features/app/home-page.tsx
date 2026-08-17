@@ -34,7 +34,7 @@ export function HomePage() {
         <article className="setup-card current">
           <span className="step-number">02</span>
           <div>
-            <h2>Sınıfları ekleyin</h2>
+            <h2>Sınıfları ekleyin.</h2>
             <p>İlk öğrenci ve yoklama işlemlerinden önce sınıf listenizi oluşturun.</p>
           </div>
           <NavLink
@@ -47,7 +47,7 @@ export function HomePage() {
         <article className="setup-card current">
           <span className="step-number">03</span>
           <div>
-            <h2>Öğrencileri ekleyin</h2>
+            <h2>Öğrencileri ekleyin.</h2>
             <p>Güncel sınıf mevcudunu oluşturun; giriş hesabını isteğe bağlı hazırlayın.</p>
           </div>
           <NavLink
@@ -60,7 +60,7 @@ export function HomePage() {
         <article className="setup-card current">
           <span className="step-number">04</span>
           <div>
-            <h2>Öğretmenleri tanımlayın</h2>
+            <h2>Öğretmenleri tanımlayın.</h2>
             <p>
               Yoklama alacak öğretmenleri telefonlarıyla önceden tanımlayın;
               ilk girişlerini OTP ile kendileri doğrular.
@@ -76,7 +76,7 @@ export function HomePage() {
         <article className="setup-card current">
           <span className="step-number">05</span>
           <div>
-            <h2>Ders saatlerini tanımlayın</h2>
+            <h2>Ders saatlerini tanımlayın.</h2>
             <p>
               Yoklamanın gün ve ders numarasına göre doğrulanması için haftalık
               saat çizelgesini oluşturun.
@@ -92,7 +92,7 @@ export function HomePage() {
         <article className="setup-card current">
           <span className="step-number">06</span>
           <div>
-            <h2>Günlük yoklamayı yönetin</h2>
+            <h2>Günlük yoklamayı yönetin.</h2>
             <p>
               Sınıf ve ders saati bazında yoklama alın; inceleme kilidi ve
               düzeltme taleplerini tek panodan takip edin.

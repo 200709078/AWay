@@ -103,7 +103,7 @@ export function SignInPage() {
 
           {step === "phone" ? (
             <form className="auth-form" onSubmit={submitPhone}>
-              <label htmlFor="phone">Telefon numarası</label>
+              <label htmlFor="phone">Telefon Numarası</label>
               <input
                 id="phone"
                 name="phone"

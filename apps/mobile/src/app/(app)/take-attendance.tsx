@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "@/components/text";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { AppScreen, EmptyState, LoadingView, Notice, Pill, PrimaryButton, uiStyles } from "@/components/ui";
 import { AccountMenu } from "@/components/account-menu";
@@ -307,7 +308,7 @@ export default function TakeAttendanceScreen() {
                   style={({ pressed }) => [styles.studentRow, isAbsent && styles.studentRowAbsent, pressed && styles.studentRowPressed]}
                 >
                   <View style={[styles.checkbox, isAbsent && styles.checkboxChecked]}>
-                    {isAbsent ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                    {isAbsent ? <View style={styles.checkboxMark} /> : null}
                   </View>
                   <Text style={styles.studentNumber}>{student.number}</Text>
                   <Text style={styles.studentName}>{student.firstName} {student.lastName}</Text>
@@ -355,7 +356,7 @@ const styles = StyleSheet.create({
   studentRowPressed: { opacity: 0.7 },
   checkbox: { alignItems: "center", borderColor: colors.border, borderRadius: 6, borderWidth: 1, height: 24, justifyContent: "center", width: 24 },
   checkboxChecked: { backgroundColor: colors.danger, borderColor: colors.danger },
-  checkboxMark: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+  checkboxMark: { borderBottomWidth: 3, borderColor: "#FFFFFF", borderLeftWidth: 3, height: 7, transform: [{ rotate: "-45deg" }], width: 14 },
   studentNumber: { color: colors.muted, fontSize: 13, fontWeight: "700", minWidth: 34, textAlign: "right" },
   studentName: { color: colors.ink, flex: 1, fontSize: 15, fontWeight: "600" },
   studentStatus: { color: colors.success, fontSize: 12, fontWeight: "700" },

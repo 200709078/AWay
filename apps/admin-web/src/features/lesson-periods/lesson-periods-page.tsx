@@ -120,7 +120,7 @@ export function LessonPeriodsPage() {
       <header className="management-heading">
         <div>
           <p className="eyebrow">YAPILANDIRMA</p>
-          <h1>Ders saatleri</h1>
+          <h1>Ders Saatleri</h1>
           <p>
             Yoklama, seçilen günün ders numarası ve saat aralığına göre
             doğrulanır.
@@ -131,7 +131,7 @@ export function LessonPeriodsPage() {
           type="button"
           onClick={() => openForm({ mode: "create" })}
         >
-          <span aria-hidden="true">+</span> Ders saati ekle
+          <span aria-hidden="true">+</span> Ders Saati Ekle
         </button>
       </header>
 
@@ -149,7 +149,7 @@ export function LessonPeriodsPage() {
       <section className="management-card" aria-labelledby="lesson-period-list-title">
         <div className="list-toolbar lesson-period-toolbar">
           <div>
-            <h2 id="lesson-period-list-title">Haftalık ders çizelgesi</h2>
+            <h2 id="lesson-period-list-title">Haftalık Ders Çizelgesi</h2>
             <p>
               Çakışan saat aralıkları kaydedilemez. Bitişi diğer dersin
               başlangıcına denk gelen saatler kullanılabilir.
@@ -312,14 +312,11 @@ function LessonPeriodForm({
     minuteToTimeInput(period?.startMinute ?? 480),
   );
   const [endTime, setEndTime] = useState(
-    minuteToTimeInput(period?.endMinute === 1440 ? 0 : (period?.endMinute ?? 520)),
-  );
-  const [endsAtMidnight, setEndsAtMidnight] = useState(
-    period?.endMinute === 1440,
+    minuteToTimeInput(period?.endMinute ?? 520),
   );
   const [localError, setLocalError] = useState("");
   const startMinute = timeInputToMinute(startTime);
-  const endMinute = endsAtMidnight ? 1440 : timeInputToMinute(endTime);
+  const endMinute = timeInputToMinute(endTime);
   const overlap =
     startMinute !== null && endMinute !== null
       ? periods.find(
@@ -367,7 +364,7 @@ function LessonPeriodForm({
           <div>
             <p className="eyebrow">DERS ÇİZELGESİ</p>
             <h2 id="lesson-period-form-title">
-              {isEditing ? "Ders saatini düzenle" : "Ders saati ekle"}
+              {isEditing ? "Ders Saatini Düzenle" : "Ders Saati Ekle"}
             </h2>
           </div>
           <button
@@ -396,7 +393,7 @@ function LessonPeriodForm({
               </select>
             </label>
             <label>
-              Ders numarası
+              Ders Numarası
               <input
                 type="number"
                 min="1"
@@ -420,18 +417,9 @@ function LessonPeriodForm({
                 type="time"
                 value={endTime}
                 onChange={(event) => setEndTime(event.target.value)}
-                disabled={endsAtMidnight}
               />
             </label>
           </div>
-          <label className="midnight-toggle">
-            <input
-              type="checkbox"
-              checked={endsAtMidnight}
-              onChange={(event) => setEndsAtMidnight(event.target.checked)}
-            />
-            Bitiş gece yarısı (24:00)
-          </label>
           <p className="field-note">
             Saatler Türkiye / İstanbul zamanına göredir. Bu değişiklik hemen
             yürürlüğe girer; geçmiş yoklama saatleri değişmez.

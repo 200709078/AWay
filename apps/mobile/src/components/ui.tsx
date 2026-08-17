@@ -2,11 +2,11 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "@/components/text";
 import type { ReactNode } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/lib/presentation";

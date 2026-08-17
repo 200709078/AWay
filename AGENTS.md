@@ -232,25 +232,13 @@ Not: Bu komutlar Node >= 22.13 gerektirir. API `build` çıktısı `dist/src/...
 6. Secret/environment değerlerini kod içine ya da commit'e asla koyma.
 7. Domainler arası gereksiz bağımlılık kurma; ortak yardımcıları `packages/` altında tut.
 
-## TODO — Mobil UX
-
-- [✓] Telefon numarası girişlerinde Türkiye mobil numarası için `05` ön eki sabit ve değiştirilemez gösterilsin; kullanıcı yalnız kalan dokuz haneyi girsin. İstemci değeri göndermeden önce numarayı eksiksiz biçimde birleştirmeli, sunucu ise kanonik E.164 normalizasyonunu sürdürmelidir.
-- [ ] Klavye açıkken formdaki odaklı alan ve birincil eylem görünür/erişilebilir kalmalı. Özellikle “düzenleme talebi” gerekçe alanı klavyenin arkasında kalmamalı; ekran klavye farkındalığı ve gerektiğinde kaydırma ile uyum sağlamalıdır.
-
 ## TODO — Yönetim, Veli ve Öğrenci Görünümleri
-
-- [ ] Yönetici webindeki öğretmen listesinde kişinin **bu okulda** sahip olduğu aktif roller gösterilsin (ör. `ADMIN`, `TEACHER`). Başka okul üyelikleri veya rolleri asla açığa çıkmamalıdır.
 - [ ] Öğretmen yönetimine düzenleme akışı eklenmesi değerlendirilsin. Önce hangi alanların düzenlenebileceği netleştirilmeli: global `User` telefonu/adı normal öğretmen düzenleme formundan değiştirilmemeli; rol ve okul-yerel erişim değişiklikleri auditli, açık işlemler olmalıdır.
 - [ ] Öğrenci ekleme akışında isteğe bağlı öğrenci, anne, baba ve diğer veli kişi/telefon bilgileriyle ön tanımlama ihtiyacı tasarlansın. Kişi telefonları global `User`, okul-yerel `Parent` profili ve `PARENT` üyeliği kurallarıyla atomik biçimde oluşturulmalı/yeniden kullanılmalı; aynı telefonun mevcut hesabı değiştirilmemeli ve telefonlar doğrudan `Student` üzerine kopyalanmamalıdır.
 - [ ] Veli girişinden sonra, ilgili okulda bağlı olduğu öğrenci veya öğrencilerin listesi gösterilsin; bir öğrenci seçildiğinde yalnız o öğrenciye ait yoklama snapshot/tarihçesi listelensin.
 - [ ] Öğrenci girişinden sonra yalnız kendi yoklama snapshot/tarihçesi listelensin.
 - [ ] İlk veli ve öğrenci görünümünün ortak bir istemci yüzeyi/ekranları kullanıp kullanmayacağı; hangi alanların, yoklama detayının ve geçmiş tarih aralığının gösterileceği ayrıca netleştirilsin. Bu kapsamda veli/öğrenci için yazma veya yoklama değiştirme yetkisi verilmez.
-
-
 - [ ] Yoklama alındığında ve düzenleme talebinde bulunulduğunda admine, yoklama düzenlemeye açıldığında sadece düzenleme talebinde bulunan öğretmene bildirim gitsin.
-- [ ] Admin in yoklama düzenleme talebinde bulunmasına gerek yok. Düzenleme talebinde bulunmadan yoklamayı direkt düzenleyebilsin. Hatta adminden yoklama bölümünü kaldıra da biliriz. Onun yerine admine teacher yetkisi veririz. Admin yoklama almak isterse mobilden teacher yetkisi ile girip normal bir öğretmen gibi yoklama da alabilir gerekirse yine kendinden düzeltme talebinde de bulunabilir. Ama adminin düzenleme yaptığının kaydı öğretmenlerdeki gibi tutulsun.
-- [ ] Üye girişi yapıldıktan sonra sağ üstteki üye butonuna tıklanınca profil ayarları vb. küçük bir menü de açılırsa iyi olur.
-- [ ] Öğrenci eklerken istenirse adres bilgisi de girilebilir olsun.
 - [ ] Bir kullanıcı mümkünse (sistemi sıkıntıya sokmayacaksa) kendine özel bilgilerini güncelleyebilsin (Mesela sağ üst köşeye eklenecek olan profil ayarları kısmından). Ancak yapılan değişiklik admine bildirim olarak gitsin (bildirim sistemi eklendiğinde). 
 - [ ] Admin web görünümünde toplu öğrenci ekleyebilmeli. Şimdilik excel, calc ile hazırlanmış dosyalardan ileride pdf ve görüntü dosyalarından. Dosyalardan okunan veri admin onayladıktan sonra eklensin.
 

@@ -18,6 +18,16 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+input,
+textarea,
+select {
+  user-select: auto;
+  -webkit-user-select: text;
 }
 
 button,
@@ -1196,24 +1206,6 @@ button:disabled {
   gap: 0.42rem;
 }
 
-.midnight-toggle {
-  align-items: center;
-  color: #526b62 !important;
-  cursor: pointer;
-  display: flex !important;
-  font-size: 0.78rem !important;
-  gap: 0.5rem;
-  margin-top: 0.1rem;
-}
-
-.dialog-form .midnight-toggle input {
-  accent-color: #176457;
-  height: 1rem;
-  min-height: auto;
-  padding: 0;
-  width: 1rem;
-}
-
 .student-form-grid label,
 .phone-field {
   display: grid;
@@ -2177,8 +2169,25 @@ button.attendance-slot:hover {
 }
 
 .selection-sign-out {
-  display: block;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.72rem;
+  color: #2f675d;
+  display: flex;
+  font-size: 0.87rem;
+  font-weight: 650;
+  gap: 0.4rem;
+  justify-content: center;
   margin: 1.5rem auto 0;
+  min-height: 2.6rem;
+  padding: 0.6rem 1rem;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.selection-sign-out:hover:not(:disabled) {
+  background: rgba(47, 103, 93, 0.08);
+  color: #125146;
 }
 
 .no-admin-card {

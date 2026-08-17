@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/text";
 import { router } from "expo-router";
 import { useAuth } from "@/features/auth/auth-context";
 import { colors, roleLabel } from "@/lib/presentation";
