@@ -218,19 +218,28 @@ export function TeachersPage() {
                         {formatDate(status === "active" ? teacher.createdAt : teacher.deletedAt)}
                       </td>
                       <td className="class-actions">
-                        <button
-                          className={`quiet-action ${status === "active" ? "danger-action" : ""}`}
-                          type="button"
-                          onClick={() => {
-                            resetMutationErrors();
-                            setConfirmation({
-                              action: status === "active" ? "archive" : "restore",
-                              teacher,
-                            });
-                          }}
-                        >
-                          {status === "active" ? "Erişimi kapat" : "Geri yükle"}
-                        </button>
+                        {status === "active" && teacher.isCurrentUser ? (
+                          <span
+                            className="self-teacher-access"
+                            title="Kendi öğretmen erişiminizi kapatamazsınız."
+                          >
+                            Kendi erişiminiz
+                          </span>
+                        ) : (
+                          <button
+                            className={`quiet-action ${status === "active" ? "danger-action" : ""}`}
+                            type="button"
+                            onClick={() => {
+                              resetMutationErrors();
+                              setConfirmation({
+                                action: status === "active" ? "archive" : "restore",
+                                teacher,
+                              });
+                            }}
+                          >
+                            {status === "active" ? "Erişimi kapat" : "Geri yükle"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

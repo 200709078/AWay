@@ -31,6 +31,7 @@ type JwtExpiresIn = NonNullable<SignOptions['expiresIn']>;
 export class AuthService {
   private readonly refreshSecret: string;
   private readonly refreshExpiresIn: JwtExpiresIn;
+  private readonly developmentOtpCode: string | null;
   private static readonly MAX_OTP_ATTEMPTS = 5;
   private static readonly MAX_OTP_REQUESTS_PER_MINUTE = 3;
 
@@ -47,6 +48,7 @@ export class AuthService {
     this.refreshSecret = refreshSecret;
     this.refreshExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ??
       '30d') as JwtExpiresIn;
+    this.developmentOtpCode = this.resolveDevelopmentOtpCode();
   }
 
   async requestOtp(phoneInput: string) {
@@ -57,7 +59,8 @@ export class AuthService {
       return this.otpRequestResponse(phone);
     }
 
-    const code = randomInt(100000, 1000000).toString();
+    const code =
+      this.developmentOtpCode ?? randomInt(100000, 1000000).toString();
     const codeHash = createHash('sha256').update(code).digest('hex');
 
     await this.createOtp(user.id, codeHash);
@@ -428,6 +431,24 @@ export class AuthService {
 
   private isDevelopmentEnvironment(): boolean {
     return !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
+  }
+
+  private resolveDevelopmentOtpCode(): string | null {
+    if (process.env.NODE_ENV !== 'development') {
+      return null;
+    }
+
+    const configuredCode = process.env.DEV_OTP_CODE?.trim();
+
+    if (!configuredCode) {
+      return null;
+    }
+
+    if (!/^\d{6}$/.test(configuredCode)) {
+      throw new Error('DEV_OTP_CODE 6 haneli bir sayı olmalıdır.');
+    }
+
+    return configuredCode;
   }
 
   private isSerializationFailure(error: unknown): boolean {

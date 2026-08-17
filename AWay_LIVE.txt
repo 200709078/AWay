@@ -1,0 +1,24 @@
+AWay — Yerel Çalıştırma Rehberi
+================================
+DOCKER
+docker compose up -d
+
+API
+pnpm dev:api
+
+ADMIN-WEB
+pnpm dev:web
+
+TUNNEL AÇ
+npx --yes wrangler tunnel quick-start http://localhost:3000
+
+Ekranda çıkan https://...trycloudflare.com adresini .env içine yapıştır.
+EXPO_PUBLIC_API_URL=https://argued-limiting-vacation-sacrifice.trycloudflare.com
+
+TUNNEL BAŞLAT
+cloudflared tunnel --url http://localhost:3000
+
+ANDROID
+/home/madematik/Android/Sdk/platform-tools/adb reverse tcp:8081 tcp:8081
+pnpm --filter @away/mobile exec expo start --dev-client --localhost --clear
+a

@@ -12,6 +12,7 @@ interface TeacherSummaryResponse {
   id: string;
   firstName: string;
   lastName: string;
+  isCurrentUser: boolean;
   deletedAt: string | null;
   account: {
     status: 'UNVERIFIED' | 'VERIFIED';
@@ -231,11 +232,33 @@ describe('Teachers (e2e)', () => {
     expect(dualRoleResponse.body).toMatchObject({
       firstName: admin.firstName,
       lastName: admin.lastName,
+      isCurrentUser: true,
     });
+
+    const listWithCurrentAdminResponse = await request(app.getHttpServer())
+      .get(teachersUrl)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      (listWithCurrentAdminResponse.body as TeacherListResponse).items,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: dualRoleTeacherId,
+          isCurrentUser: true,
+        }),
+      ]),
+    );
+
     await request(app.getHttpServer())
       .delete(`${teachersUrl}/${dualRoleTeacherId}`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .expect(200);
+      .expect(403);
+    expect(
+      await prisma.schoolMembership.findUniqueOrThrow({
+        where: { id: dualRoleTeacherId },
+      }),
+    ).toMatchObject({ deletedAt: null });
     await request(app.getHttpServer())
       .get(`/schools/${school.id}/attendances/board?date=2026-08-10`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -252,7 +275,9 @@ describe('Teachers (e2e)', () => {
       .expect(409);
 
     expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: existingAccount.id } }),
+      await prisma.user.findUniqueOrThrow({
+        where: { id: existingAccount.id },
+      }),
     ).toMatchObject({
       firstName: 'Mevcut',
       lastName: 'Hesap',

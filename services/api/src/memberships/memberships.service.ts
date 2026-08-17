@@ -22,6 +22,7 @@ interface TeacherRecord {
   updatedAt: Date;
   deletedAt: Date | null;
   user: {
+    id: string;
     firstName: string;
     lastName: string;
     phone: string;
@@ -36,6 +37,7 @@ const teacherSummarySelect = {
   deletedAt: true,
   user: {
     select: {
+      id: true,
       firstName: true,
       lastName: true,
       phone: true,
@@ -48,7 +50,11 @@ const teacherSummarySelect = {
 export class MembershipsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findTeachers(schoolId: string, query: ListTeachersQueryDto) {
+  async findTeachers(
+    schoolId: string,
+    query: ListTeachersQueryDto,
+    actorUserId: string,
+  ) {
     const status = query.status ?? 'active';
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
@@ -88,7 +94,9 @@ export class MembershipsService {
     ]);
 
     return {
-      items: teachers.map((teacher) => this.toTeacherSummary(teacher)),
+      items: teachers.map((teacher) =>
+        this.toTeacherSummary(teacher, actorUserId),
+      ),
       page,
       pageSize,
       total,
@@ -156,7 +164,7 @@ export class MembershipsService {
           },
         });
 
-        return this.toTeacherSummary(membership);
+        return this.toTeacherSummary(membership, currentActor.userId);
       });
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
@@ -197,6 +205,12 @@ export class MembershipsService {
         );
       }
 
+      if (teacher.userId === currentActor.userId) {
+        throw new ForbiddenException(
+          'Kendi öğretmen erişiminizi kapatamazsınız.',
+        );
+      }
+
       const archivedAt = new Date();
       const archive = await tx.schoolMembership.updateMany({
         where: {
@@ -209,9 +223,7 @@ export class MembershipsService {
       });
 
       if (archive.count === 0) {
-        throw new ConflictException(
-          'Öğretmen arşivlenemedi. Tekrar deneyin.',
-        );
+        throw new ConflictException('Öğretmen arşivlenemedi. Tekrar deneyin.');
       }
 
       const archived = await tx.schoolMembership.findUniqueOrThrow({
@@ -231,7 +243,7 @@ export class MembershipsService {
         },
       });
 
-      return this.toTeacherSummary(archived);
+      return this.toTeacherSummary(archived, currentActor.userId);
     });
   }
 
@@ -294,7 +306,7 @@ export class MembershipsService {
         },
       });
 
-      return this.toTeacherSummary(restored);
+      return this.toTeacherSummary(restored, currentActor.userId);
     });
   }
 
@@ -371,9 +383,9 @@ export class MembershipsService {
     teacherId: string,
   ) {
     const memberships = await prisma.$queryRaw<
-      Array<{ id: string; deletedAt: Date | null }>
+      Array<{ id: string; userId: string; deletedAt: Date | null }>
     >`
-      SELECT "id", "deletedAt"
+      SELECT "id", "userId", "deletedAt"
       FROM "SchoolMembership"
       WHERE "id" = ${teacherId}
         AND "schoolId" = ${schoolId}
@@ -411,11 +423,12 @@ export class MembershipsService {
     return created;
   }
 
-  private toTeacherSummary(teacher: TeacherRecord) {
+  private toTeacherSummary(teacher: TeacherRecord, actorUserId: string) {
     return {
       id: teacher.id,
       firstName: teacher.user.firstName,
       lastName: teacher.user.lastName,
+      isCurrentUser: teacher.user.id === actorUserId,
       createdAt: teacher.createdAt,
       updatedAt: teacher.updatedAt,
       deletedAt: teacher.deletedAt,

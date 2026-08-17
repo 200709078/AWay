@@ -21,8 +21,13 @@ describe('Auth flow (e2e)', () => {
   let prisma: PrismaService;
   const createdSchoolIds: string[] = [];
   const createdUserIds: string[] = [];
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalDevOtpCode = process.env.DEV_OTP_CODE;
 
   beforeAll(async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.DEV_OTP_CODE = '111111';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -46,6 +51,42 @@ describe('Auth flow (e2e)', () => {
     }
 
     await app.close();
+
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+
+    if (originalDevOtpCode === undefined) {
+      delete process.env.DEV_OTP_CODE;
+    } else {
+      process.env.DEV_OTP_CODE = originalDevOtpCode;
+    }
+  });
+
+  it('uses the configured fixed OTP for the development app', async () => {
+    const user = await createEligibleUser();
+
+    await request(app.getHttpServer())
+      .post('/auth/request-otp')
+      .send({ phone: user.phone })
+      .expect(201);
+
+    const otp = await prisma.otpCode.findFirstOrThrow({
+      where: {
+        userId: user.id,
+        consumedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    expect(otp.codeHash).toBe(hash('111111'));
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-otp')
+      .send({ phone: user.phone, code: '111111' })
+      .expect(201);
   });
 
   it('only issues OTPs to active memberships and invalidates a previous code', async () => {

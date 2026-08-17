@@ -6,6 +6,7 @@ export interface TeacherSummary {
   id: string;
   firstName: string;
   lastName: string;
+  isCurrentUser: boolean;
   account: {
     status: "UNVERIFIED" | "VERIFIED";
     phoneMasked: string;

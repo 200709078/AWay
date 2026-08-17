@@ -1948,6 +1948,13 @@ button.attendance-slot:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.self-teacher-access {
+  color: #75847e;
+  font-size: 0.74rem;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
 .teacher-dialog {
   max-width: 34rem;
 }

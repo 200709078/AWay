@@ -35,8 +35,13 @@ export class MembershipsController {
   findAll(
     @Query() query: ListTeachersQueryDto,
     @CurrentSchoolAccess() access: SchoolAccess,
+    @CurrentUser() user: CurrentUserType,
   ) {
-    return this.membershipsService.findTeachers(access.school.id, query);
+    return this.membershipsService.findTeachers(
+      access.school.id,
+      query,
+      user.id,
+    );
   }
 
   @Post()
